@@ -1,0 +1,70 @@
+{
+  "name": "cheminfo-mcp-server",
+  "version": "0.0.0",
+  "license": "MIT",
+  "description": "Serve tools to MCP clients and to the cheminfo chat, with the structures they draw carried beside the answer",
+  "keywords": [
+    "mcp",
+    "model context protocol",
+    "cheminfo",
+    "fastify",
+    "tools"
+  ],
+  "author": "Luc Patiny",
+  "type": "module",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client/index.js",
+    "./contract": "./lib/contract/index.js"
+  },
+  "files": [
+    "lib",
+    "src"
+  ],
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "clean": "rimraf coverage lib",
+    "eslint": "eslint .",
+    "eslint-fix": "eslint . --fix",
+    "prepack": "npm run tsc",
+    "prettier": "prettier --check .",
+    "prettier-write": "prettier --write .",
+    "test": "npm run test-only && npm run check-types && npm run eslint && npm run prettier",
+    "test-only": "vitest run --coverage",
+    "tsc": "npm run clean && npm run tsc-build",
+    "tsc-build": "tsc --project tsconfig.build.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1"
+  },
+  "peerDependencies": {
+    "fastify": "^5.12.7",
+    "zod": "^4.6.7"
+  },
+  "peerDependenciesMeta": {
+    "fastify": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@vitest/coverage-v8": "^5.0.5",
+    "@zakodium/tsconfig": "^1.0.5",
+    "eslint": "^10.13.0",
+    "eslint-config-cheminfo-typescript": "^23.0.0",
+    "fastify": "^5.12.7",
+    "prettier": "^3.9.10",
+    "rimraf": "^6.1.3",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.5",
+    "zod": "^4.6.7"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cheminfo/cheminfo-mcp-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cheminfo/cheminfo-mcp-server/issues"
+  },
+  "homepage": "https://github.com/cheminfo/cheminfo-mcp-server#readme"
+}
