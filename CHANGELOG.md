@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/cheminfo/cheminfo-mcp-server/compare/v0.1.0...v0.2.0) (2026-10-19)
+
+
+### Features
+
+* let a tool refuse with its own status and fields, and check the tool name first ([0711523](https://github.com/cheminfo/cheminfo-mcp-server/commit/0711523974fb0c47319edda61238b820d471e4d0))
+
 ## 0.1.0 (2026-10-19)
 
 
