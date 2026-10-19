@@ -44,7 +44,8 @@ export interface McpServerOptions<Context> extends RunToolOptions {
 /**
  * The MCP server of one request: every tool registered with its strict
  * schema, title and annotations; a call answers the tool's result as JSON
- * text, or an error result the model reads.
+ * text, then the content of each file it produced (an MCP client has no side
+ * channel), or an error result the model reads.
  * @param options - The server's identity, its tools and the context.
  * @returns The server, to connect to the request's transport.
  */
@@ -77,6 +78,10 @@ export function createMcpServer<Context>(
         return {
           content: [
             { type: 'text', text: JSON.stringify(run.reply.result, null, 2) },
+            ...(run.reply.files ?? []).map((file) => ({
+              type: 'text' as const,
+              text: file.content,
+            })),
           ],
         };
       },

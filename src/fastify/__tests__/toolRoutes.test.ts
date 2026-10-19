@@ -4,7 +4,7 @@ import { afterAll, expect, test } from 'vitest';
 
 import type { SampleServer } from '../../__tests__/sampleServer.ts';
 import { startSampleServer } from '../../__tests__/sampleServer.ts';
-import { SAMPLE_TOKEN } from '../../__tests__/sampleTools.ts';
+import { METHANE, SAMPLE_TOKEN } from '../../__tests__/sampleTools.ts';
 
 const server: SampleServer = await startSampleServer();
 
@@ -54,6 +54,7 @@ test('GET tools is the catalog, the same for every caller', async () => {
     'drawBenzene',
     'explode',
     'loading',
+    'writeMolfile',
   ]);
 });
 
@@ -130,6 +131,7 @@ test('an MCP client lists the tools and calls one, reading the result as JSON te
     ['drawBenzene', true],
     ['explode', true],
     ['loading', true],
+    ['writeMolfile', true],
   ]);
   expect(result.content).toStrictEqual([
     { type: 'text', text: JSON.stringify({ sum: 9 }, null, 2) },
@@ -173,7 +175,7 @@ test('MCP: no token is a 401 with Bearer, a foreign origin a 403, a server that 
   ]);
   expect(foreign.status).toBe(403);
   expect(listed.status).toBe(200);
-  expect(tools).toHaveLength(5);
+  expect(tools).toHaveLength(6);
   expect([call.isError, call.content]).toStrictEqual([
     true,
     [
@@ -228,4 +230,35 @@ test('an unknown tool is a 404 before any credential; a tool refuses with its ow
     [{ type: 'text', text: 'The copy is loading. Try again in a minute.' }],
   ]);
   expect(server.errors).toHaveLength(failuresBefore);
+});
+
+test("MCP answers a file's content after the result: a client has no side channel", async () => {
+  const client = await connect({ 'x-token': SAMPLE_TOKEN });
+  const written = await client.callTool({
+    name: 'writeMolfile',
+    arguments: {},
+  });
+  await client.close();
+
+  expect(written.content).toStrictEqual([
+    { type: 'text', text: JSON.stringify({ name: 'methane' }, null, 2) },
+    { type: 'text', text: METHANE },
+  ]);
+});
+
+test("allowedOrigins '*' lets any browser origin call MCP", async () => {
+  const open = await startSampleServer({ allowedOrigins: '*' });
+  const response = await fetch(new URL('mcp', open.baseUrl), {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
+      'x-token': SAMPLE_TOKEN,
+      origin: 'https://anywhere.example',
+    },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+  });
+  await open.app.close();
+
+  expect(response.status).toBe(200);
 });

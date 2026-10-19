@@ -117,7 +117,7 @@ export function createToolRoutes<Context>(
         if (
           origin !== undefined &&
           origin !== own &&
-          !(options.allowedOrigins ?? []).includes(origin)
+          !isAllowedOrigin(origin, options.allowedOrigins)
         ) {
           return rpcError(
             reply,
@@ -159,4 +159,17 @@ export function createToolRoutes<Context>(
       });
     }
   };
+}
+
+/**
+ * Whether a foreign browser origin may call the MCP endpoint.
+ * @param origin - The request's Origin.
+ * @param allowed - The allowed origins, or `'*'` for any.
+ * @returns True when allowed.
+ */
+function isAllowedOrigin(
+  origin: string,
+  allowed: readonly string[] | '*' | undefined,
+): boolean {
+  return allowed === '*' || (allowed ?? []).includes(origin);
 }

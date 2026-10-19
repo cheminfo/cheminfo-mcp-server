@@ -27,9 +27,13 @@ export interface SampleServer {
 /**
  * The sample tools served under `/v1`, listening on a free port of
  * 127.0.0.1, with the well-known routes at the root.
+ * @param overrides - Settings to change.
+ * @param overrides.allowedOrigins - The foreign origins allowed on MCP.
  * @returns The server; close its `app` after the tests.
  */
-export async function startSampleServer(): Promise<SampleServer> {
+export async function startSampleServer(
+  overrides: { allowedOrigins?: readonly string[] | '*' } = {},
+): Promise<SampleServer> {
   const errors: unknown[] = [];
   const app = fastify();
   await app.register(wellKnownNotFound);
@@ -40,7 +44,9 @@ export async function startSampleServer(): Promise<SampleServer> {
       instructions: 'Sample tools for the tests.',
       tools: SAMPLE_TOOLS,
       resolveContext: resolveSampleContext,
-      allowedOrigins: ['https://inspector.example.org'],
+      allowedOrigins: overrides.allowedOrigins ?? [
+        'https://inspector.example.org',
+      ],
       unknownToolMessage: (tool) => `Unknown sample tool: ${tool}`,
       onError: (error) => {
         errors.push(error);

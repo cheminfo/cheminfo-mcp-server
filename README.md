@@ -10,7 +10,7 @@ One tool definition gives a server three routes:
 | `POST tools/{name}` | the chat, the page   | `{ result, molecules, reactions?, spectra?, files? }`                           |
 | `POST mcp`          | MCP clients          | MCP's Streamable HTTP, stateless: a server per request, JSON answers            |
 
-`result` is what the model reads. The other fields are drawn by the page or the chat beside it.
+`result` is what the model reads. The other fields are drawn by the page or the chat beside it. An MCP client has no such side channel, so MCP answers the result as JSON text, then the content of each file the tool produced.
 
 ## Installation
 
@@ -90,7 +90,7 @@ createToolRoutes<{ email: string }>({
 
 A refusal answers its status before MCP starts, with `WWW-Authenticate: Bearer` on a 401. A 503 is the exception: MCP still lists the tools, and each call answers the refusal's sentence, so a client sees the tools while the server catches up. `route` is `'mcp'` or `'tools'`, for a server that accepts different credentials on each.
 
-A browser `Origin` other than the page's own is refused on `POST mcp` unless listed in `allowedOrigins`.
+A browser `Origin` other than the page's own is refused on `POST mcp` unless listed in `allowedOrigins`, or unless `allowedOrigins` is `'*'`, which suits a server that reads no credential.
 
 ## A client
 

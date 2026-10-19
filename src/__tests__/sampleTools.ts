@@ -72,8 +72,27 @@ export const refusingTool = defineTool({
   },
 });
 
+export const molfileTool = defineTool({
+  name: 'writeMolfile',
+  title: 'Write a molfile',
+  description: 'Methane as a molfile.',
+  schema: z.strictObject({}),
+  execute: () => ({
+    result: { name: 'methane' },
+    files: [
+      { fileName: 'methane.mol', format: 'MDL Molfile', content: METHANE },
+    ],
+  }),
+});
+
 /**
- * The five tools of the sample server.
+ * A molfile, as a file a tool produces.
+ */
+export const METHANE =
+  'methane\n\n  1  0  0  0  0  0  0  0  0  0999 V2000\nM  END\n';
+
+/**
+ * The six tools of the sample server.
  */
 export const SAMPLE_TOOLS = [
   additionTool,
@@ -81,6 +100,7 @@ export const SAMPLE_TOOLS = [
   benzeneTool,
   failingTool,
   refusingTool,
+  molfileTool,
 ];
 
 /**

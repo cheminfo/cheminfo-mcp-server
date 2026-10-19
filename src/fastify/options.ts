@@ -35,10 +35,12 @@ export interface ToolRoutesBaseOptions<Context> {
   instructions?: string;
   tools: ToolList<Context>;
   /**
-   * Browser origins allowed on `POST mcp` besides the page's own.
+   * Browser origins allowed on `POST mcp` besides the page's own, or `'*'`
+   * for any: only for a server that reads no credential, where a page
+   * elsewhere can do nothing a script could not.
    * @default []
    */
-  allowedOrigins?: readonly string[];
+  allowedOrigins?: readonly string[] | '*';
   /**
    * The page's own origin.
    * @default `${request.protocol}://${request.host}`
