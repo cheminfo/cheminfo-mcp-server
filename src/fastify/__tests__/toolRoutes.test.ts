@@ -53,6 +53,7 @@ test('GET tools is the catalog, the same for every caller', async () => {
     'whoAmI',
     'drawBenzene',
     'explode',
+    'loading',
   ]);
 });
 
@@ -102,7 +103,7 @@ test('POST tools/:name refuses with a status, a code and a sentence', async () =
   ]);
   expect([unknown.statusCode, unknown.json()]).toStrictEqual([
     404,
-    { error: 'Unknown tool: deleteAll', code: 'not-found' },
+    { error: 'Unknown sample tool: deleteAll', code: 'not-found' },
   ]);
   expect([failed.statusCode, failed.json()]).toStrictEqual([
     500,
@@ -128,6 +129,7 @@ test('an MCP client lists the tools and calls one, reading the result as JSON te
     ['whoAmI', true],
     ['drawBenzene', true],
     ['explode', true],
+    ['loading', true],
   ]);
   expect(result.content).toStrictEqual([
     { type: 'text', text: JSON.stringify({ sum: 9 }, null, 2) },
@@ -171,7 +173,7 @@ test('MCP: no token is a 401 with Bearer, a foreign origin a 403, a server that 
   ]);
   expect(foreign.status).toBe(403);
   expect(listed.status).toBe(200);
-  expect(tools).toHaveLength(4);
+  expect(tools).toHaveLength(5);
   expect([call.isError, call.content]).toStrictEqual([
     true,
     [
@@ -194,4 +196,36 @@ test('GET mcp is not allowed, and every well-known address answers 404 as JSON',
     404,
     { error: 'Not found.', code: 'not-found' },
   ]);
+});
+
+test('an unknown tool is a 404 before any credential; a tool refuses with its own status, extras and Retry-After', async () => {
+  const failuresBefore = server.errors.length;
+  const unknown = await post('tools/deleteAll', {}, {});
+  const loading = await post('tools/loading', {}, { 'x-token': SAMPLE_TOKEN });
+  const client = await connect({ 'x-token': SAMPLE_TOKEN });
+  const call = await client.callTool({ name: 'loading', arguments: {} });
+  await client.close();
+
+  expect([unknown.statusCode, unknown.json()]).toStrictEqual([
+    404,
+    { error: 'Unknown sample tool: deleteAll', code: 'not-found' },
+  ]);
+  expect([
+    loading.statusCode,
+    loading.headers['retry-after'],
+    loading.json(),
+  ]).toStrictEqual([
+    503,
+    '30',
+    {
+      error: 'The copy is loading. Try again in a minute.',
+      code: 'loading',
+      mirror: { state: 'catching-up', progress: 0.4 },
+    },
+  ]);
+  expect([call.isError, call.content]).toStrictEqual([
+    true,
+    [{ type: 'text', text: 'The copy is loading. Try again in a minute.' }],
+  ]);
+  expect(server.errors).toHaveLength(failuresBefore);
 });

@@ -3,7 +3,7 @@ import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import type { ToolCatalog } from '../contract/index.ts';
 import { createMcpServer } from '../mcp/createMcpServer.ts';
 import { buildToolCatalog } from '../tools/catalog.ts';
-import { runTool } from '../tools/runTool.ts';
+import { findTool, runTool, unknownToolMessage } from '../tools/runTool.ts';
 import { toolsOf } from '../tools/types.ts';
 
 import type { ContextResolver, ToolRoutesOptions } from './options.ts';
@@ -13,7 +13,8 @@ import { refuseMcp, serveMcp } from './serveMcp.ts';
 /**
  * The routes of a tool server, to register under the API's prefix (`/v1`):
  * `GET tools` (the catalog), `POST tools/:name` (one call, as JSON, with the
- * structures drawn beside it) and `POST mcp` (MCP's Streamable HTTP,
+ * structures drawn beside it; an unknown name is a 404 before the context is
+ * resolved) and `POST mcp` (MCP's Streamable HTTP,
  * stateless: a server per request, JSON answers). A refusal of the context
  * answers its status before MCP starts, except a 503: MCP then lists the
  * tools and each call says why.
@@ -69,14 +70,27 @@ export function createToolRoutes<Context>(
         }),
       },
       async (request, reply) => {
+        // The name is checked first: an unknown tool is a 404, whoever asks.
+        const tools = toolsOf(options.tools);
+        const toolName = request.params.name;
+        if (findTool(tools, toolName) === undefined) {
+          return sendRefusal(reply, {
+            status: 404,
+            code: 'not-found',
+            error: unknownToolMessage(toolName, options),
+          });
+        }
         const resolved = await resolve(request, 'tools');
         if (!resolved.ok) return sendRefusal(reply, resolved.refusal);
         const run = await runTool(
-          toolsOf(options.tools),
-          request.params.name,
+          tools,
+          toolName,
           request.body ?? {},
           resolved.context,
-          { onError: onError(request) },
+          {
+            onError: onError(request),
+            unknownToolMessage: options.unknownToolMessage,
+          },
         );
         if (!run.ok) return sendRefusal(reply, run.refusal);
         return reply.header('cache-control', 'no-store').send(run.reply);

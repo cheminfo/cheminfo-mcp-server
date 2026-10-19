@@ -47,6 +47,7 @@ export async function readResponse<Schema extends z.ZodType>(
         : `The tool server answered ${response.status}.`,
       retryAfter:
         Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : null,
+      reply: refusal.success ? refusal.data : null,
     },
   };
 }
@@ -65,6 +66,13 @@ export function fail(
 ): { ok: false; failure: ToolClientFailure } {
   return {
     ok: false,
-    failure: { kind, status, code: null, message, retryAfter: null },
+    failure: {
+      kind,
+      status,
+      code: null,
+      message,
+      retryAfter: null,
+      reply: null,
+    },
   };
 }

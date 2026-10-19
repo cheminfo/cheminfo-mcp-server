@@ -57,6 +57,8 @@ await app.register(
 
 - A tool's schema is a strict zod object: an unknown parameter is refused. A parameter set to `null` is left out, and a single value under another name is moved to a tool's only parameter, because small models rename it.
 - A tool that throws answers 500 to the JSON route and an error result to MCP. The error itself never reaches the caller; `onError` is told.
+- A tool refuses a call with its own status by throwing `new ToolRefusalError({ status: 503, code: 'loading', error: 'The copy is loading.', retryAfter: 30, extra: { mirror } })`. The JSON route answers that status, `{ error, code, ...extra }` and Retry-After; MCP answers `error` as an error result.
+- An unknown tool is a 404 before the caller is checked; `unknownToolMessage` words it.
 - Tools are read-only by default (`READ_ONLY_ANNOTATIONS`); a tool says otherwise with `annotations`.
 - `tools` may be a function, evaluated per request, when the descriptions change at run time.
 - `routeConfig` is merged into the `config` of the two POST routes, for `@fastify/rate-limit`.
@@ -107,7 +109,7 @@ if (run.ok) {
 }
 ```
 
-Every reply is checked against the contract. A malformed side channel is dropped, never the result. A redirect is never followed, so a credential never leaves for another address. A failure is `refused` (the server's own code and sentence, with Retry-After), `unreachable`, `timeout` or `invalid-reply`.
+Every reply is checked against the contract. A malformed side channel is dropped, never the result. A redirect is never followed, so a credential never leaves for another address. A failure is `refused` (the server's own code and sentence, with Retry-After, and its whole refusal in `reply`, the server's own fields included), `unreachable`, `timeout` or `invalid-reply`.
 
 ## The contract
 

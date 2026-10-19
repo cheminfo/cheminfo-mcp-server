@@ -37,6 +37,7 @@ test('the client reads the catalog once per minute, and calls a tool with its si
     'whoAmI',
     'drawBenzene',
     'explode',
+    'loading',
   ]);
   expect(catalogCalls).toBe(2);
   expect(drawn).toStrictEqual({
@@ -62,6 +63,7 @@ test("a refusal carries the server's code, sentence and Retry-After", async () =
       code: 'no-credentials',
       message: 'Send your token in x-token.',
       retryAfter: null,
+      reply: { error: 'Send your token in x-token.', code: 'no-credentials' },
     },
   });
   await expect(
@@ -78,6 +80,10 @@ test("a refusal carries the server's code, sentence and Retry-After", async () =
       code: 'access-unverifiable',
       message: 'Cannot check your token now. Try again in a minute.',
       retryAfter: 60,
+      reply: {
+        error: 'Cannot check your token now. Try again in a minute.',
+        code: 'access-unverifiable',
+      },
     },
   });
 });
@@ -122,4 +128,18 @@ test('no answer, a late answer, a redirect and an answer outside the contract ar
     failureOf(odd.callTool('addNumbers', {})),
   ).resolves.toStrictEqual(['invalid-reply', 200]);
   expect(redirect).toBe('manual');
+});
+
+test("a refusal's own fields reach the client", async () => {
+  const client = createToolClient({
+    baseUrl: server.baseUrl,
+    headers: { 'x-token': SAMPLE_TOKEN },
+  });
+  const loading = await client.callTool('loading', {});
+
+  expect(loading.ok ? null : loading.failure.reply).toStrictEqual({
+    error: 'The copy is loading. Try again in a minute.',
+    code: 'loading',
+    mirror: { state: 'catching-up', progress: 0.4 },
+  });
 });

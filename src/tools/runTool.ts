@@ -13,6 +13,7 @@ import type {
   ToolRefusal,
   ToolSchema,
 } from './types.ts';
+import { ToolRefusalError } from './types.ts';
 
 /**
  * What a call gave: the reply, or why there is none.
@@ -29,6 +30,11 @@ export interface RunToolOptions {
    * @default undefined
    */
   onError?: (error: unknown, name: string) => void;
+  /**
+   * The sentence of a 404 for a tool that does not exist.
+   * @default (name) => `Unknown tool: ${name}`
+   */
+  unknownToolMessage?: (name: string) => string;
 }
 
 /**
@@ -39,7 +45,8 @@ export const TOOL_FAILED = 'The tool failed. Try again later.';
 /**
  * Run one call: find the tool (404 `not-found`), check its arguments (400
  * `invalid-arguments`), and answer, the side channels trimmed to their
- * limits and left out when empty. A tool that throws is a 500 `internal`.
+ * limits and left out when empty. A tool that throws a ToolRefusalError
+ * refuses with it; any other error is a 500 `internal`.
  * @param tools - The server's tools.
  * @param name - The tool asked for.
  * @param parameters - Its arguments, as received.
@@ -54,9 +61,9 @@ export async function runTool<Context>(
   context: Context,
   options: RunToolOptions = {},
 ): Promise<ToolRun> {
-  const tool = tools.find((candidate) => candidate.name === name);
+  const tool = findTool(tools, name);
   if (tool === undefined) {
-    return refuse(404, 'not-found', `Unknown tool: ${name}`);
+    return refuse(404, 'not-found', unknownToolMessage(name, options));
   }
   const parsed = parseToolArguments(tool, parameters);
   if (!parsed.success) {
@@ -66,6 +73,9 @@ export async function runTool<Context>(
   try {
     answer = await tool.execute(parsed.data, context);
   } catch (error) {
+    if (error instanceof ToolRefusalError) {
+      return { ok: false, refusal: error.refusal };
+    }
     options.onError?.(error, name);
     return refuse(500, 'internal', TOOL_FAILED);
   }
@@ -90,6 +100,32 @@ function replyOf(answer: ToolAnswer): ToolRunReply {
   const files = (answer.files ?? []).slice(0, MAX_FILES);
   if (files.length > 0) reply.files = files;
   return reply;
+}
+
+/**
+ * The tool of that name.
+ * @param tools - The server's tools.
+ * @param name - The name asked for.
+ * @returns The tool, or undefined when none has that name.
+ */
+export function findTool<Context>(
+  tools: ReadonlyArray<ToolDefinition<ToolSchema, Context>>,
+  name: string,
+): ToolDefinition<ToolSchema, Context> | undefined {
+  return tools.find((candidate) => candidate.name === name);
+}
+
+/**
+ * The sentence of a 404 for a tool that does not exist.
+ * @param name - The name asked for.
+ * @param options - The server's wording, if any.
+ * @returns The sentence.
+ */
+export function unknownToolMessage(
+  name: string,
+  options: Pick<RunToolOptions, 'unknownToolMessage'>,
+): string {
+  return options.unknownToolMessage?.(name) ?? `Unknown tool: ${name}`;
 }
 
 function refuse(status: number, code: string, error: string): ToolRun {

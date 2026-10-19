@@ -2,7 +2,7 @@ import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import type { ContextResolution } from '../mcp/createMcpServer.ts';
-import { defineTool } from '../tools/types.ts';
+import { ToolRefusalError, defineTool } from '../tools/types.ts';
 
 /**
  * Who a request of the sample server acts for.
@@ -56,14 +56,31 @@ export const failingTool = defineTool({
   },
 });
 
+export const refusingTool = defineTool({
+  name: 'loading',
+  title: 'Loading',
+  description: 'Refuses while its data loads.',
+  schema: z.strictObject({}),
+  execute: () => {
+    throw new ToolRefusalError({
+      status: 503,
+      code: 'loading',
+      error: 'The copy is loading. Try again in a minute.',
+      retryAfter: 30,
+      extra: { mirror: { state: 'catching-up', progress: 0.4 } },
+    });
+  },
+});
+
 /**
- * The four tools of the sample server.
+ * The five tools of the sample server.
  */
 export const SAMPLE_TOOLS = [
   additionTool,
   identityTool,
   benzeneTool,
   failingTool,
+  refusingTool,
 ];
 
 /**

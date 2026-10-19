@@ -19,7 +19,12 @@ export {
   parseToolArguments,
 } from './tools/parseToolArguments.ts';
 export type { RunToolOptions, ToolRun } from './tools/runTool.ts';
-export { TOOL_FAILED, runTool } from './tools/runTool.ts';
+export {
+  TOOL_FAILED,
+  findTool,
+  runTool,
+  unknownToolMessage,
+} from './tools/runTool.ts';
 export type {
   ToolAnswer,
   ToolDefinition,
@@ -27,4 +32,4 @@ export type {
   ToolRefusal,
   ToolSchema,
 } from './tools/types.ts';
-export { defineTool, toolsOf } from './tools/types.ts';
+export { ToolRefusalError, defineTool, toolsOf } from './tools/types.ts';

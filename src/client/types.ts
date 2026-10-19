@@ -1,4 +1,8 @@
-import type { ToolCatalog, ToolRunReply } from '../contract/index.ts';
+import type {
+  ErrorReply,
+  ToolCatalog,
+  ToolRunReply,
+} from '../contract/index.ts';
 
 /**
  * A fetch: the global one, or a test's fake.
@@ -30,6 +34,11 @@ export interface ToolClientFailure {
    * Seconds to wait, from Retry-After, or null.
    */
   retryAfter: number | null;
+  /**
+   * The server's whole refusal, its own fields included (`mirror`,
+   * `promptSection`), or null when it answered none.
+   */
+  reply: ErrorReply | null;
 }
 
 /**

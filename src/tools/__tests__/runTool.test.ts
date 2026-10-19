@@ -63,3 +63,29 @@ test('an unknown tool, invalid arguments and a tool that throws are refused', as
   expect(onError).toHaveBeenCalledOnce();
   expect(onError.mock.calls[0]?.[1]).toBe('explode');
 });
+
+test("a ToolRefusalError is the caller's answer, and no failure", async () => {
+  const onError = vi.fn();
+
+  await expect(
+    runTool(SAMPLE_TOOLS, 'loading', {}, ALICE, { onError }),
+  ).resolves.toStrictEqual({
+    ok: false,
+    refusal: {
+      status: 503,
+      code: 'loading',
+      error: 'The copy is loading. Try again in a minute.',
+      retryAfter: 30,
+      extra: { mirror: { state: 'catching-up', progress: 0.4 } },
+    },
+  });
+  await expect(
+    runTool(SAMPLE_TOOLS, 'deleteAll', {}, ALICE, {
+      unknownToolMessage: (name) => `No ${name} here.`,
+    }),
+  ).resolves.toStrictEqual({
+    ok: false,
+    refusal: { status: 404, code: 'not-found', error: 'No deleteAll here.' },
+  });
+  expect(onError).not.toHaveBeenCalled();
+});

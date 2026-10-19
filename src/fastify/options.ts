@@ -59,6 +59,11 @@ export interface ToolRoutesBaseOptions<Context> {
    * @default undefined - the request's logger logs it
    */
   onError?: (error: unknown, name: string, request: FastifyRequest) => void;
+  /**
+   * The sentence of a 404 for a tool that does not exist.
+   * @default (name) => `Unknown tool: ${name}`
+   */
+  unknownToolMessage?: (name: string) => string;
 }
 
 /**

@@ -3,8 +3,8 @@ import type { FastifyPluginAsync, FastifyReply, FastifySchema } from 'fastify';
 import type { ToolRefusal } from '../tools/types.ts';
 
 /**
- * Answer a refusal of the JSON API: its status, `{error, code}`, and
- * Retry-After when given.
+ * Answer a refusal of the JSON API: its status, `{error, code}` followed
+ * by its extra fields, and Retry-After when given.
  * @param reply - The reply.
  * @param refusal - Why.
  * @returns The reply, sent.
@@ -18,7 +18,7 @@ export function sendRefusal(
   }
   return reply
     .code(refusal.status)
-    .send({ error: refusal.error, code: refusal.code });
+    .send({ error: refusal.error, code: refusal.code, ...refusal.extra });
 }
 
 /**

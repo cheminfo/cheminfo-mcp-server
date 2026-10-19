@@ -41,6 +41,7 @@ export async function startSampleServer(): Promise<SampleServer> {
       tools: SAMPLE_TOOLS,
       resolveContext: resolveSampleContext,
       allowedOrigins: ['https://inspector.example.org'],
+      unknownToolMessage: (tool) => `Unknown sample tool: ${tool}`,
       onError: (error) => {
         errors.push(error);
       },

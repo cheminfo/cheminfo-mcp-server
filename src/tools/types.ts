@@ -70,8 +70,9 @@ export interface ToolDefinition<
    */
   annotations?: ToolAnnotations;
   /**
-   * Answer one call. Throwing answers 500 to the JSON route and an error
-   * result to MCP; the error itself never reaches the caller.
+   * Answer one call. A ToolRefusalError is the caller's answer; any other
+   * error answers 500 to the JSON route and an error result to MCP, and
+   * never reaches the caller itself.
    * @param parameters - The arguments, validated by `schema`.
    * @param context - What the server resolved for this request.
    */
@@ -106,6 +107,31 @@ export interface ToolRefusal {
    * @default undefined
    */
   retryAfter?: number;
+  /**
+   * More fields of the JSON refusal, after `error` and `code`: a server's
+   * own (`mirror`, `promptSection`). MCP reads only `error`.
+   * @default undefined
+   */
+  extra?: Record<string, unknown>;
+}
+
+/**
+ * Thrown by a tool to refuse a call with its own status, code and sentence,
+ * e.g. a 503 while the data cannot be checked. Unlike any other error, the
+ * caller reads it.
+ */
+export class ToolRefusalError extends Error {
+  public readonly refusal: ToolRefusal;
+
+  /**
+   * Refuse the call.
+   * @param refusal - What the caller reads.
+   */
+  public constructor(refusal: ToolRefusal) {
+    super(refusal.error);
+    this.name = 'ToolRefusalError';
+    this.refusal = refusal;
+  }
 }
 
 /**
