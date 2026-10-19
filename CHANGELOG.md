@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/cheminfo/cheminfo-mcp-server/compare/v0.2.0...v0.3.0) (2026-10-19)
+
+
+### Features
+
+* answer a tool's files over MCP, and let a server admit any origin ([f7e688f](https://github.com/cheminfo/cheminfo-mcp-server/commit/f7e688f79e14df0cfa20b8db6e794b99e7395951))
+
 ## [0.2.0](https://github.com/cheminfo/cheminfo-mcp-server/compare/v0.1.0...v0.2.0) (2026-10-19)
 
 
