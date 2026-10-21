@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/cheminfo/cheminfo-mcp-server/compare/v0.3.0...v0.4.0) (2026-10-21)
+
+
+### Features
+
+* serve MCP Apps views as resources, with per-route settings ([d2b0d21](https://github.com/cheminfo/cheminfo-mcp-server/commit/d2b0d21255061836048bed1b19b55c934a935515))
+
 ## [0.3.0](https://github.com/cheminfo/cheminfo-mcp-server/compare/v0.2.0...v0.3.0) (2026-10-19)
 
 
