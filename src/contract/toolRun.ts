@@ -30,6 +30,17 @@ export const ToolRunReplySchema = z.object({
     .optional()
     .catch(undefined),
   files: z.array(DisplayFileSchema).max(MAX_FILES).optional().catch(undefined),
+  /**
+   * MCP's `structuredContent`: the result as data, for a view.
+   */
+  structuredContent: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .catch(undefined),
+  /**
+   * MCP's `_meta`: what a view reads and the model never does.
+   */
+  _meta: z.record(z.string(), z.unknown()).optional().catch(undefined),
 });
 
 /**

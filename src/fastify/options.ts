@@ -1,7 +1,10 @@
-import type { FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import type { ContextResolution } from '../mcp/createMcpServer.ts';
-import type { ToolList } from '../tools/types.ts';
+import type { AppResourceList } from '../tools/apps.ts';
+import type { ToolList, ToolRefusal } from '../tools/types.ts';
+
+import type { RouteDocumentation } from './replies.ts';
 
 /**
  * Which route a context is resolved for: MCP clients, or the JSON API.
@@ -9,12 +12,77 @@ import type { ToolList } from '../tools/types.ts';
 export type ToolRoute = 'mcp' | 'tools';
 
 /**
- * Resolves the context of a request, or refuses it.
+ * Resolves the context of a request, or refuses it. The reply is given for
+ * what a refusal must change besides its body, such as clearing a session
+ * cookie that ended; the route sends the refusal.
  */
 export type ContextResolver<Context> = (
   request: FastifyRequest,
   route: ToolRoute,
+  reply: FastifyReply,
 ) => ContextResolution<Context> | Promise<ContextResolution<Context>>;
+
+/**
+ * The settings of one route, over the defaults of every route.
+ */
+export interface ToolRouteSettings {
+  /**
+   * The route's whole schema: its documentation, headers, body, params and
+   * responses, as the server documents them. The run route's params must
+   * still name `name`.
+   * @default the package's own documentation
+   */
+  schema?: RouteDocumentation;
+  /**
+   * Largest body accepted, in bytes.
+   * @default the `bodyLimit` of every POST route
+   */
+  bodyLimit?: number;
+  /**
+   * The route's Fastify `config`; on the two POST routes, merged over
+   * `routeConfig`.
+   * @default {}
+   */
+  config?: Record<string, unknown>;
+}
+
+/**
+ * The settings of each route of a tool server.
+ */
+export interface ToolRoutesSettings {
+  /**
+   * `GET tools`, the catalog.
+   * @default {}
+   */
+  catalog?: ToolRouteSettings;
+  /**
+   * `POST tools/:name`, one call as JSON; its `config` is merged over
+   * `routeConfig`.
+   * @default {}
+   */
+  run?: ToolRouteSettings;
+  /**
+   * `POST mcp`, MCP's Streamable HTTP; its `config` is merged over
+   * `routeConfig`.
+   * @default {}
+   */
+  mcp?: ToolRouteSettings;
+  /**
+   * `GET mcp` and `DELETE mcp`, which answer 405.
+   * @default {}
+   */
+  mcpNotAllowed?: ToolRouteSettings;
+  /**
+   * `GET resources`, the app resources and their versions.
+   * @default {}
+   */
+  resources?: ToolRouteSettings;
+  /**
+   * `GET resources/read?uri=…`, one resource's page, with its ETag.
+   * @default {}
+   */
+  resourceRead?: ToolRouteSettings;
+}
 
 /**
  * The options every server gives.
@@ -34,6 +102,27 @@ export interface ToolRoutesBaseOptions<Context> {
    */
   instructions?: string;
   tools: ToolList<Context>;
+  /**
+   * The MCP Apps the tools' answers are drawn with, or a function giving
+   * them for a request (their assets may be served from its origin): MCP's
+   * resources/list and resources/read, and `GET resources` and
+   * `GET resources/read?uri=…` for a host speaking JSON, which a server
+   * without this option does not have.
+   * @default undefined - no resources, and no resource routes
+   */
+  resources?: AppResourceList<FastifyRequest>;
+  /**
+   * The JSON length of an answer's `_meta` above which the request's logger
+   * warns.
+   * @default 60000
+   */
+  metaWarnSize?: number;
+  /**
+   * The JSON length of the result a model reads above which the request's
+   * logger warns.
+   * @default 100000
+   */
+  resultWarnSize?: number;
   /**
    * Browser origins allowed on `POST mcp` besides the page's own, or `'*'`
    * for any: only for a server that reads no credential, where a page
@@ -66,6 +155,23 @@ export interface ToolRoutesBaseOptions<Context> {
    * @default (name) => `Unknown tool: ${name}`
    */
   unknownToolMessage?: (name: string) => string;
+  /**
+   * The settings of each route: `catalog` (`GET tools`), `run`
+   * (`POST tools/:name`), `mcp` (`POST mcp`), `mcpNotAllowed` (`GET` and
+   * `DELETE mcp`), `resources` (`GET resources`) and `resourceRead`
+   * (`GET resources/read`).
+   * @default {}
+   */
+  routes?: ToolRoutesSettings;
+  /**
+   * A cheap check before the arguments are read, e.g. that a credential is
+   * there at all: a refusal answers before anything else runs.
+   * @default undefined - no check
+   */
+  precheck?: (
+    request: FastifyRequest,
+    route: ToolRoute,
+  ) => ToolRefusal | undefined;
 }
 
 /**

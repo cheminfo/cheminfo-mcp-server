@@ -1,7 +1,20 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
-import { READ_ONLY_ANNOTATIONS } from '../contract/index.ts';
+import {
+  APP_MIME_TYPE,
+  READ_ONLY_ANNOTATIONS,
+  toCallToolResult,
+  toErrorCallToolResult,
+} from '../contract/index.ts';
+import type { AppResource } from '../tools/apps.ts';
+import {
+  RESOURCE_FAILED,
+  appResourceUi,
+  readAppResource,
+  uniqueResources,
+} from '../tools/apps.ts';
+import { toolMetaOf } from '../tools/catalog.ts';
 import type { RunToolOptions } from '../tools/runTool.ts';
 import { runTool } from '../tools/runTool.ts';
 import type {
@@ -29,7 +42,8 @@ export interface McpServerOptions<Context> extends RunToolOptions {
    */
   version: string;
   /**
-   * What the model is told about the tools as a whole.
+   * What the model is told about the tools as a whole; none is sent when
+   * empty.
    * @default ''
    */
   instructions?: string;
@@ -39,22 +53,46 @@ export interface McpServerOptions<Context> extends RunToolOptions {
    * listed, and each call answers that sentence as an error result.
    */
   context: ContextResolution<Context>;
+  /**
+   * The MCP Apps the tools' answers are drawn with, served by
+   * resources/list and resources/read.
+   * @default []
+   */
+  resources?: readonly AppResource[];
+  /**
+   * Told when a resource's page cannot be made, or a resource is left out
+   * because another has its uri; the host reads only RESOURCE_FAILED.
+   * @default undefined
+   */
+  onResourceError?: (error: unknown, uri: string) => void;
 }
 
 /**
+ * The `_meta` key older MCP Apps hosts read a tool's resource from.
+ */
+export const LEGACY_RESOURCE_URI_KEY = 'ui/resourceUri';
+
+/**
  * The MCP server of one request: every tool registered with its strict
- * schema, title and annotations; a call answers the tool's result as JSON
- * text, then the content of each file it produced (an MCP client has no side
- * channel), or an error result the model reads.
- * @param options - The server's identity, its tools and the context.
+ * schema, title, annotations and `_meta` (its view, also under the key older
+ * hosts read); a call answers the tool's result as JSON text, then the
+ * content of each file it produced (an MCP client has no side channel), with
+ * its `structuredContent` and `_meta`, or an error result the model reads.
+ * The app resources are listed and read as MCP Apps.
+ * @param options - The server's identity, its tools, resources and context.
  * @returns The server, to connect to the request's transport.
  */
 export function createMcpServer<Context>(
   options: McpServerOptions<Context>,
 ): McpServer {
   const { name, version, instructions = '', tools, context } = options;
-  const server = new McpServer({ name, version }, { instructions });
+  const server = new McpServer(
+    { name, version },
+    instructions === '' ? undefined : { instructions },
+  );
   for (const tool of tools) {
+    const meta = toolMetaOf(tool);
+    const resourceUri = resourceUriOf(meta);
     server.registerTool(
       tool.name,
       {
@@ -62,26 +100,62 @@ export function createMcpServer<Context>(
         description: tool.description,
         inputSchema: tool.schema,
         annotations: tool.annotations ?? READ_ONLY_ANNOTATIONS,
+        ...(meta !== undefined && {
+          _meta:
+            resourceUri === undefined
+              ? meta
+              : { ...meta, [LEGACY_RESOURCE_URI_KEY]: resourceUri },
+        }),
       },
       async (arguments_: Record<string, unknown>): Promise<CallToolResult> => {
-        if (!context.ok) return errorResult(context.refusal.error);
+        if (!context.ok) return toErrorCallToolResult(context.refusal.error);
         const run = await runTool(
           tools,
           tool.name,
           arguments_,
           context.context,
-          {
-            onError: options.onError,
-          },
+          options,
         );
-        if (!run.ok) return errorResult(run.refusal.error);
+        return run.ok
+          ? toCallToolResult(run.reply)
+          : toErrorCallToolResult(run.refusal.error);
+      },
+    );
+  }
+  const resources = uniqueResources(options.resources ?? [], (uri) =>
+    options.onResourceError?.(
+      new Error(`Another resource has the uri ${uri}: this one is left out.`),
+      uri,
+    ),
+  );
+  for (const resource of resources) {
+    server.registerResource(
+      resource.name,
+      resource.uri,
+      {
+        description: resource.description,
+        mimeType: APP_MIME_TYPE,
+        _meta: { ui: appResourceUi(resource) },
+      },
+      async () => {
+        let read: Awaited<ReturnType<typeof readAppResource>>;
+        try {
+          read = await readAppResource(resource);
+        } catch (error) {
+          options.onResourceError?.(error, resource.uri);
+          // The SDK answers a thrown error as JSON-RPC's internal error,
+          // with its message.
+          throw new Error(RESOURCE_FAILED, { cause: error });
+        }
+        const { listing, html } = read;
         return {
-          content: [
-            { type: 'text', text: JSON.stringify(run.reply.result, null, 2) },
-            ...(run.reply.files ?? []).map((file) => ({
-              type: 'text' as const,
-              text: file.content,
-            })),
+          contents: [
+            {
+              uri: resource.uri,
+              mimeType: APP_MIME_TYPE,
+              text: html,
+              _meta: listing._meta,
+            },
           ],
         };
       },
@@ -91,10 +165,16 @@ export function createMcpServer<Context>(
 }
 
 /**
- * A refusal as an MCP tool result.
- * @param message - What the model reads.
- * @returns The error result.
+ * The resource a tool's `_meta.ui` names, read leniently: a field this
+ * version does not know never hides it.
+ * @param meta - The tool's `_meta`.
+ * @returns The resource's uri, if any.
  */
-function errorResult(message: string): CallToolResult {
-  return { content: [{ type: 'text', text: message }], isError: true };
+function resourceUriOf(
+  meta: Record<string, unknown> | undefined,
+): string | undefined {
+  const ui = meta?.ui;
+  if (typeof ui !== 'object' || ui === null) return undefined;
+  const { resourceUri } = ui as { resourceUri?: unknown };
+  return typeof resourceUri === 'string' ? resourceUri : undefined;
 }

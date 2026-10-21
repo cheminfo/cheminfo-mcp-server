@@ -6,12 +6,16 @@ import type {
   DisplayReaction,
   DisplaySpectrum,
   ToolAnnotations,
+  ToolUi,
 } from '../contract/index.ts';
 
 /**
- * A tool's arguments: a strict zod object, so an unknown one is refused.
+ * A tool's arguments: a strict zod object, so an unknown one is refused; or,
+ * for a tool that forwards its call to another server, a loose one made by
+ * `proxySchema()`, which another server checks.
  */
-export type ToolSchema = ZodObject<ZodRawShape, core.$strict>;
+export type ToolSchema =
+  ZodObject<ZodRawShape, core.$strict> | ZodObject<ZodRawShape, core.$loose>;
 
 /**
  * What a tool answers: what the model reads, and what is drawn beside it.
@@ -41,6 +45,16 @@ export interface ToolAnswer {
    * @default []
    */
   files?: DisplayFile[];
+  /**
+   * MCP's `structuredContent`: the result as data, for a view.
+   * @default undefined
+   */
+  structuredContent?: Record<string, unknown>;
+  /**
+   * MCP's `_meta` of the result: what a view reads and the model never does.
+   * @default undefined
+   */
+  meta?: Record<string, unknown>;
 }
 
 /**
@@ -69,6 +83,18 @@ export interface ToolDefinition<
    * @default READ_ONLY_ANNOTATIONS
    */
   annotations?: ToolAnnotations;
+  /**
+   * The app resource that draws the answer (`ui://…`), and who may call the
+   * tool: `['app']` keeps it from the model, a view's own call.
+   * @default undefined - no view, and both may call it
+   */
+  ui?: ToolUi;
+  /**
+   * More of the tool's `_meta` on tools/list and in the catalog; `ui` wins
+   * over a `ui` here. A forwarded tool passes the other server's on.
+   * @default undefined
+   */
+  meta?: Record<string, unknown>;
   /**
    * Answer one call. A ToolRefusalError is the caller's answer; any other
    * error answers 500 to the JSON route and an error result to MCP, and

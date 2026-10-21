@@ -16,7 +16,7 @@ export type ToolArgumentsParse<Arguments> =
  * parameters.
  * @param tool - The tool's name and schema.
  * @param tool.name - The tool's name, for the message.
- * @param tool.schema - Its strict schema.
+ * @param tool.schema - Its schema: strict, or loose for a forwarded tool.
  * @param parameters - The arguments as received.
  * @returns The validated arguments, or the message to give back.
  */
@@ -41,7 +41,9 @@ export function parseToolArguments<Schema extends ToolSchema>(
     if (value !== null) given[key] = value;
   }
   const parsed = schema.safeParse(normalizeToolArguments(schema, given));
-  if (parsed.success) return { success: true, data: parsed.data };
+  if (parsed.success) {
+    return { success: true, data: parsed.data as z.output<Schema> };
+  }
   return {
     success: false,
     error: `Invalid arguments for ${name}: ${z.prettifyError(parsed.error)}. ${expected}`,

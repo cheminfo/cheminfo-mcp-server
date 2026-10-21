@@ -22,6 +22,10 @@ export interface SampleServer {
    * What the tools threw.
    */
   errors: unknown[];
+  /**
+   * How many times a context was resolved.
+   */
+  resolved: { count: number };
 }
 
 /**
@@ -35,6 +39,7 @@ export async function startSampleServer(
   overrides: { allowedOrigins?: readonly string[] | '*' } = {},
 ): Promise<SampleServer> {
   const errors: unknown[] = [];
+  const resolved = { count: 0 };
   const app = fastify();
   await app.register(wellKnownNotFound);
   await app.register(
@@ -43,7 +48,19 @@ export async function startSampleServer(
       version: '1.2.3',
       instructions: 'Sample tools for the tests.',
       tools: SAMPLE_TOOLS,
-      resolveContext: resolveSampleContext,
+      resolveContext: (request) => {
+        resolved.count++;
+        return resolveSampleContext(request);
+      },
+      precheck: (request) =>
+        request.headers['x-token'] === undefined
+          ? {
+              status: 401,
+              code: 'no-credentials',
+              error: 'Send your token in x-token.',
+            }
+          : undefined,
+      routes: { run: { bodyLimit: 2048 } },
       allowedOrigins: overrides.allowedOrigins ?? [
         'https://inspector.example.org',
       ],
@@ -56,5 +73,10 @@ export async function startSampleServer(
   );
   await app.listen({ port: 0, host: '127.0.0.1' });
   const { port } = app.server.address() as AddressInfo;
-  return { app, baseUrl: new URL(`http://127.0.0.1:${port}/v1/`), errors };
+  return {
+    app,
+    baseUrl: new URL(`http://127.0.0.1:${port}/v1/`),
+    errors,
+    resolved,
+  };
 }

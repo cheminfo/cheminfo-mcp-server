@@ -1,7 +1,12 @@
 import type { z } from 'zod';
 
-import type { ToolCatalog } from '../contract/index.ts';
-import { ToolCatalogSchema, ToolRunReplySchema } from '../contract/index.ts';
+import type { ResourceRead, ToolCatalog } from '../contract/index.ts';
+import {
+  ResourceListSchema,
+  ResourceReadSchema,
+  ToolCatalogSchema,
+  ToolRunReplySchema,
+} from '../contract/index.ts';
 
 import { fail, readResponse } from './readResponse.ts';
 import type {
@@ -28,6 +33,8 @@ export function createToolClient(options: ToolClientOptions): ToolClient {
     cached = { at: now(), value };
   };
 
+  const pages = new Map<string, { etag: string; value: ResourceRead }>();
+
   async function call<Schema extends z.ZodType>(
     url: URL,
     init: RequestInit,
@@ -35,6 +42,16 @@ export function createToolClient(options: ToolClientOptions): ToolClient {
     schema: Schema,
     callOptions: ToolCallOptions,
   ): Promise<ToolClientResult<z.output<Schema>>> {
+    const sent = await send(url, init, timeoutMs, callOptions);
+    return sent.ok ? readResponse(sent.response, schema) : sent;
+  }
+
+  async function send(
+    url: URL,
+    init: RequestInit,
+    timeoutMs: number,
+    callOptions: ToolCallOptions,
+  ): Promise<ReturnType<typeof fail> | { ok: true; response: Response }> {
     const signals = [AbortSignal.timeout(timeoutMs)];
     if (callOptions.signal) signals.push(callOptions.signal);
     let response: Response;
@@ -51,6 +68,7 @@ export function createToolClient(options: ToolClientOptions): ToolClient {
           ...(init.body !== undefined && {
             'content-type': 'application/json',
           }),
+          ...(init.headers as Record<string, string> | undefined),
         },
       });
     } catch (error) {
@@ -64,7 +82,7 @@ export function createToolClient(options: ToolClientOptions): ToolClient {
           : 'Cannot reach the tool server.',
       );
     }
-    return readResponse(response, schema);
+    return { ok: true, response };
   }
 
   return {
@@ -90,6 +108,39 @@ export function createToolClient(options: ToolClientOptions): ToolClient {
         ToolRunReplySchema,
         callOptions,
       );
+    },
+    resources(callOptions = {}) {
+      return call(
+        new URL('resources', base),
+        { method: 'GET' },
+        timeouts.catalog,
+        ResourceListSchema,
+        callOptions,
+      );
+    },
+    async readResource(uri, callOptions = {}) {
+      const url = new URL('resources/read', base);
+      url.searchParams.set('uri', uri);
+      const known = pages.get(uri);
+      const sent = await send(
+        url,
+        {
+          method: 'GET',
+          ...(known && { headers: { 'if-none-match': known.etag } }),
+        },
+        timeouts.catalog,
+        callOptions,
+      );
+      if (!sent.ok) return sent;
+      if (sent.response.status === 304 && known) {
+        return { ok: true, value: known.value };
+      }
+      const result = await readResponse(sent.response, ResourceReadSchema);
+      const etag = sent.response.headers.get('etag');
+      if (result.ok && etag !== null) {
+        pages.set(uri, { etag, value: result.value });
+      }
+      return result;
     },
   };
 }

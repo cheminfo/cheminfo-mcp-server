@@ -62,7 +62,7 @@ export interface RouteDocumentation extends FastifySchema {
    * The Swagger tags.
    * @default undefined
    */
-  tags?: string[];
+  tags?: readonly string[];
   /**
    * One line for the Swagger UI.
    * @default undefined
@@ -88,4 +88,23 @@ export interface RouteDocumentation extends FastifySchema {
  */
 export function withDocumentation(schema: RouteDocumentation): FastifySchema {
   return schema;
+}
+
+/**
+ * Whether a request's If-None-Match names an ETag: any of its list, weak
+ * or strong, or `*`.
+ * @param ifNoneMatch - The header.
+ * @param etag - The ETag, quoted.
+ * @returns True when the client holds that version.
+ */
+export function isEtagHeld(
+  ifNoneMatch: string | undefined,
+  etag: string,
+): boolean {
+  if (ifNoneMatch === undefined) return false;
+  for (const part of ifNoneMatch.split(',')) {
+    const tag = part.trim();
+    if (['*', etag, `W/${etag}`].includes(tag)) return true;
+  }
+  return false;
 }

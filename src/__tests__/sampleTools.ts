@@ -2,6 +2,7 @@ import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import type { ContextResolution } from '../mcp/createMcpServer.ts';
+import { proxySchema } from '../tools/proxySchema.ts';
 import { ToolRefusalError, defineTool } from '../tools/types.ts';
 
 /**
@@ -92,7 +93,28 @@ export const METHANE =
   'methane\n\n  1  0  0  0  0  0  0  0  0  0999 V2000\nM  END\n';
 
 /**
- * The six tools of the sample server.
+ * The JSON Schema of a tool another server answers.
+ */
+export const REMOTE_SCHEMA = {
+  type: 'object',
+  properties: {
+    kind: { type: 'string', enum: ['sample', 'reaction'] },
+    text: { type: 'string', maxLength: 2000 },
+  },
+  required: ['kind'],
+  additionalProperties: false,
+};
+
+export const forwardingTool = defineTool({
+  name: 'remoteSearch',
+  title: 'Remote search',
+  description: 'Forwarded to another server, which checks the arguments.',
+  schema: proxySchema(REMOTE_SCHEMA),
+  execute: (parameters) => ({ result: { forwarded: parameters } }),
+});
+
+/**
+ * The seven tools of the sample server.
  */
 export const SAMPLE_TOOLS = [
   additionTool,
@@ -101,6 +123,7 @@ export const SAMPLE_TOOLS = [
   failingTool,
   refusingTool,
   molfileTool,
+  forwardingTool,
 ];
 
 /**

@@ -15,7 +15,8 @@
   "exports": {
     ".": "./lib/index.js",
     "./client": "./lib/client/index.js",
-    "./contract": "./lib/contract/index.js"
+    "./contract": "./lib/contract/index.js",
+    "./views": "./lib/views/index.js"
   },
   "files": [
     "lib",
@@ -38,15 +39,20 @@
     "@modelcontextprotocol/sdk": "^1.32.1"
   },
   "peerDependencies": {
+    "@fastify/static": "^10.1.6",
     "fastify": "^5.12.7",
     "zod": "^4.6.7"
   },
   "peerDependenciesMeta": {
+    "@fastify/static": {
+      "optional": true
+    },
     "fastify": {
       "optional": true
     }
   },
   "devDependencies": {
+    "@fastify/static": "^10.1.6",
     "@types/node": "^26.6.5",
     "@vitest/coverage-v8": "^5.0.5",
     "@zakodium/tsconfig": "^1.0.5",

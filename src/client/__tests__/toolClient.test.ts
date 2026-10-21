@@ -39,6 +39,7 @@ test('the client reads the catalog once per minute, and calls a tool with its si
     'explode',
     'loading',
     'writeMolfile',
+    'remoteSearch',
   ]);
   expect(catalogCalls).toBe(2);
   expect(drawn).toStrictEqual({

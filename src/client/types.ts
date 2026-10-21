@@ -1,5 +1,7 @@
 import type {
   ErrorReply,
+  ResourceList,
+  ResourceRead,
   ToolCatalog,
   ToolRunReply,
 } from '../contract/index.ts';
@@ -83,7 +85,7 @@ export interface ToolClientOptions {
   headers?: Record<string, string>;
   /**
    * Milliseconds before a call is abandoned.
-   * @default { catalog: 5000, tool: 60000 }
+   * @default { catalog: 5000, tool: 60000 } - resources take the catalog's
    */
   timeouts?: { catalog?: number; tool?: number };
   /**
@@ -116,4 +118,18 @@ export interface ToolClient {
     parameters: Record<string, unknown>,
     options?: ToolCallOptions,
   ) => Promise<ToolClientResult<ToolRunReply>>;
+  /**
+   * `GET resources`: the MCP Apps and their versions.
+   */
+  resources: (
+    options?: ToolCallOptions,
+  ) => Promise<ToolClientResult<ResourceList>>;
+  /**
+   * `GET resources/read?uri=…`: one MCP App's page. A page read before is
+   * asked again with its ETag, and reused when the server answers 304.
+   */
+  readResource: (
+    uri: string,
+    options?: ToolCallOptions,
+  ) => Promise<ToolClientResult<ResourceRead>>;
 }

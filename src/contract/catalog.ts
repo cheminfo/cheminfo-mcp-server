@@ -38,6 +38,11 @@ export const CatalogToolSchema = z.object({
    */
   inputSchema: z.record(z.string(), z.unknown()),
   annotations: ToolAnnotationsSchema.optional(),
+  /**
+   * What MCP's tools/list carries beside: `ui` (the resource drawing the
+   * answer, and who may call the tool), and a server's own fields.
+   */
+  _meta: z.record(z.string(), z.unknown()).optional(),
 });
 
 /**

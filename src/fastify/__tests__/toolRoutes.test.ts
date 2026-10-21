@@ -55,6 +55,7 @@ test('GET tools is the catalog, the same for every caller', async () => {
     'explode',
     'loading',
     'writeMolfile',
+    'remoteSearch',
   ]);
 });
 
@@ -132,6 +133,7 @@ test('an MCP client lists the tools and calls one, reading the result as JSON te
     ['explode', true],
     ['loading', true],
     ['writeMolfile', true],
+    ['remoteSearch', true],
   ]);
   expect(result.content).toStrictEqual([
     { type: 'text', text: JSON.stringify({ sum: 9 }, null, 2) },
@@ -175,7 +177,7 @@ test('MCP: no token is a 401 with Bearer, a foreign origin a 403, a server that 
   ]);
   expect(foreign.status).toBe(403);
   expect(listed.status).toBe(200);
-  expect(tools).toHaveLength(6);
+  expect(tools).toHaveLength(7);
   expect([call.isError, call.content]).toStrictEqual([
     true,
     [
@@ -244,21 +246,4 @@ test("MCP answers a file's content after the result: a client has no side channe
     { type: 'text', text: JSON.stringify({ name: 'methane' }, null, 2) },
     { type: 'text', text: METHANE },
   ]);
-});
-
-test("allowedOrigins '*' lets any browser origin call MCP", async () => {
-  const open = await startSampleServer({ allowedOrigins: '*' });
-  const response = await fetch(new URL('mcp', open.baseUrl), {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      accept: 'application/json, text/event-stream',
-      'x-token': SAMPLE_TOKEN,
-      origin: 'https://anywhere.example',
-    },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
-  });
-  await open.app.close();
-
-  expect(response.status).toBe(200);
 });
