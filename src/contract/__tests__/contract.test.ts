@@ -18,6 +18,26 @@ test('a malformed side channel is dropped, never the answer the model reads', ()
   });
 });
 
+test('the measurements of a structure are kept, and a malformed list drops alone', () => {
+  const molfile3D = 'water\n';
+  const parsed = ToolRunReplySchema.parse({
+    result: { angle: '104.0' },
+    molecules: [
+      { molfile3D, measurements: [{ atoms: [1, 0, 2] }, { atoms: [0, 1] }] },
+      { molfile3D, measurements: [{ atoms: [0] }] },
+      { molfile3D, measurements: [{ atoms: [0, 1, 2, 3, 4] }] },
+      { molfile3D, measurements: [{ atoms: [-1, 2] }] },
+    ],
+  });
+
+  expect(parsed.molecules).toStrictEqual([
+    { molfile3D, measurements: [{ atoms: [1, 0, 2] }, { atoms: [0, 1] }] },
+    { molfile3D, measurements: undefined },
+    { molfile3D, measurements: undefined },
+    { molfile3D, measurements: undefined },
+  ]);
+});
+
 test('a curve is kept whole, and a curve whose axes differ in length is dropped', () => {
   const curve = {
     title: 'Titration of NaOH by HCl',

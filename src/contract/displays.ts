@@ -9,6 +9,10 @@ export const MAX_DISPLAY_FIELD = 2_000_000;
  */
 export const MAX_MOLECULES = 12;
 /**
+ * Measurements drawn at most on one structure.
+ */
+export const MAX_MEASUREMENTS = 12;
+/**
  * Reaction schemes drawn at most for one tool call.
  */
 export const MAX_REACTIONS = 4;
@@ -32,9 +36,19 @@ export const MAX_CURVE_POINTS = 100_000;
 const Field = z.string().max(MAX_DISPLAY_FIELD);
 
 /**
+ * A measurement the answer states, drawn on the structure's 3D model: two
+ * atoms for a distance, three for an angle, four for a dihedral angle, as
+ * zero-based indices into the atoms of the molecule's `molfile3D`.
+ */
+export const DisplayMeasurementSchema = z.object({
+  atoms: z.array(z.number().int().min(0)).min(2).max(4),
+});
+
+/**
  * A structure to draw beside a tool's answer, never shown to the model: its
- * idCode (with coordinates), SMILES or molfile, an optional 3D molfile, and
- * what its card is named by.
+ * idCode (with coordinates), SMILES or molfile, an optional 3D molfile with
+ * the measurements to draw on it, and what its card is named by. A malformed
+ * list of measurements is dropped, never the structure.
  */
 export const DisplayMoleculeSchema = z.object({
   idCode: Field.optional(),
@@ -42,6 +56,11 @@ export const DisplayMoleculeSchema = z.object({
   smiles: Field.optional(),
   molfile: Field.optional(),
   molfile3D: Field.optional(),
+  measurements: z
+    .array(DisplayMeasurementSchema)
+    .max(MAX_MEASUREMENTS)
+    .optional()
+    .catch(undefined),
   label: Field.optional(),
 });
 
@@ -118,6 +137,10 @@ export const DisplayFileSchema = z.object({
   content: Field,
 });
 
+/**
+ * A measurement drawn on a structure's 3D model.
+ */
+export type DisplayMeasurement = z.infer<typeof DisplayMeasurementSchema>;
 /**
  * A structure to draw beside a tool's answer.
  */
