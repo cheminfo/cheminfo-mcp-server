@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/cheminfo/cheminfo-mcp-server/compare/v0.4.0...v0.5.0) (2026-10-22)
+
+
+### Features
+
+* show a site's own page as a tool's view ([3dfacab](https://github.com/cheminfo/cheminfo-mcp-server/commit/3dfacab0a97519f823741c469e7d0de67fa5d05e))
+
 ## [0.4.0](https://github.com/cheminfo/cheminfo-mcp-server/compare/v0.3.0...v0.4.0) (2026-10-21)
 
 
