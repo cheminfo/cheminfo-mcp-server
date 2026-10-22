@@ -1,6 +1,6 @@
 {
   "name": "cheminfo-mcp-server",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "license": "MIT",
   "description": "Serve tools to MCP clients and to the cheminfo chat, with the structures they draw carried beside the answer",
   "keywords": [

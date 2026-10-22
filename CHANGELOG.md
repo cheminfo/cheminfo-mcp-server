@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/cheminfo/cheminfo-mcp-server/compare/v0.6.1...v0.6.2) (2026-10-22)
+
+
+### Bug Fixes
+
+* start a sandboxed page's workers from a blob: URL, so WebKit lets them read a Blob ([c2e6172](https://github.com/cheminfo/cheminfo-mcp-server/commit/c2e6172c7af2ee77332659a459e75bb2cef34176))
+
 ## [0.6.1](https://github.com/cheminfo/cheminfo-mcp-server/compare/v0.6.0...v0.6.1) (2026-10-22)
 
 
