@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/cheminfo/cheminfo-mcp-server/compare/v0.5.0...v0.6.0) (2026-10-22)
+
+
+### Features
+
+* carry measurements on a displayed molecule ([bdff5a7](https://github.com/cheminfo/cheminfo-mcp-server/commit/bdff5a718177808499d7b059d40e70526e5e0bf7))
+* open a card's site page in a new window ([aad55d6](https://github.com/cheminfo/cheminfo-mcp-server/commit/aad55d609e5e8165c6c50dd503f5c85e3be17c0b))
+
 ## [0.5.0](https://github.com/cheminfo/cheminfo-mcp-server/compare/v0.4.0...v0.5.0) (2026-10-22)
 
 
