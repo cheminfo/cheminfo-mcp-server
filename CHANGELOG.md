@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/cheminfo/cheminfo-mcp-server/compare/v0.6.0...v0.6.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* fold a card that never loads to a line linking to its page ([555d725](https://github.com/cheminfo/cheminfo-mcp-server/commit/555d725c6ec9c5bd5e359c1c0bbec57c64ef84f5))
+
 ## [0.6.0](https://github.com/cheminfo/cheminfo-mcp-server/compare/v0.5.0...v0.6.0) (2026-10-22)
 
 
