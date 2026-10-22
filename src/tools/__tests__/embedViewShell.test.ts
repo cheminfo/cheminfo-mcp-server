@@ -65,13 +65,38 @@ test('inline, the card fits its content within the height the host allows', asyn
   expect(shell.appended).toHaveLength(0);
 });
 
-test('a card that never reports its height gets the default one', async () => {
+test('a card that does not report is folded to a line linking to its page, and comes back when it reports', async () => {
   const shell = startShell();
+  await shell.start({ containerDimensions: INLINE });
+  shell.answer(embedMeta(CARD, { page: PAGE }));
+  for (const timer of shell.timers) timer();
+
+  expect(shell.card.style.height).toBe('0px');
+  expect(shell.note.hidden).toBe(false);
+  expect(sizes(shell.sent)).toStrictEqual([120, 44]);
+
+  shell.clickOpen();
+
+  expect(shell.sent.at(-1)).toMatchObject({
+    method: 'ui/open-link',
+    params: { url: 'https://site.example/ph?acid=HCl' },
+  });
+
+  shell.fromCard({ type: 'cheminfo:embed-height', height: 200 });
+
+  expect(shell.card.style.height).toBe('200px');
+  expect(shell.note.hidden).toBe(true);
+  expect(sizes(shell.sent)).toStrictEqual([120, 44, 200]);
+});
+
+test('a view that sets a height frames a card that never reports at it', async () => {
+  const shell = startShell(undefined, 640);
   await shell.start({});
   shell.answer(embedMeta(CARD));
   for (const timer of shell.timers) timer();
 
   expect(shell.card.style.height).toBe('640px');
+  expect(shell.note.hidden).toBe(true);
   expect(sizes(shell.sent)).toStrictEqual([120, 640]);
 });
 

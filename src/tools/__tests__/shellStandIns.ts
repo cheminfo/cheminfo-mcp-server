@@ -81,13 +81,18 @@ function fakeFrame(isHidden: boolean): FakeFrame {
  * Run the view's script against stand-ins of its document, its host, its
  * timers and the user's activation.
  * @param origins - The origins the view frames.
+ * @param height - The view's `height` option, for a page that cannot report.
  * @returns The stand-ins, and functions to speak for the host and the frames.
  */
-export function startShell(origins: string[] = ['https://site.example']) {
+export function startShell(
+  origins: string[] = ['https://site.example'],
+  height?: number,
+) {
   const html = embedView({
     uri: 'ui://site/page',
     name: 'site.example',
     origins,
+    ...(height !== undefined && { height }),
   }).html as string;
   const script =
     /<script>(?<code>[\s\S]*)<\/script>/.exec(html)?.groups?.code ?? '';
@@ -96,6 +101,13 @@ export function startShell(origins: string[] = ['https://site.example']) {
     [];
   const timers: Array<() => void> = [];
   const status = { hidden: false, textContent: 'Loading…' };
+  const note = { hidden: true };
+  const clicks: Array<() => void> = [];
+  const openButton = {
+    addEventListener: (_type: string, listener: () => void) => {
+      clicks.push(listener);
+    },
+  };
   const card = fakeFrame(true);
   const appended: FakeFrame[] = [];
   const activation = { isActive: false };
@@ -114,7 +126,8 @@ export function startShell(origins: string[] = ['https://site.example']) {
     },
   };
   const document = {
-    getElementById: (id: string) => (id === 'card' ? card : status),
+    getElementById: (id: string) =>
+      ({ card, note, open: openButton })[id] ?? status,
     createElement: () => fakeFrame(false),
     body: {
       append: (frame: FakeFrame) => {
@@ -140,6 +153,10 @@ export function startShell(origins: string[] = ['https://site.example']) {
   return {
     sent,
     status,
+    note,
+    clickOpen: () => {
+      for (const click of clicks) click();
+    },
     card,
     appended,
     timers,

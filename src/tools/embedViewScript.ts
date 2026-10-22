@@ -7,9 +7,10 @@
  *   view's origins, as the browser reads it.
  * - Inline, the card frame is as tall as the card reports (from a hidden
  *   card, a height above 0), within the host's `maxHeight`, or exactly the
- *   height the host fixes. A card that never reports gets the default after
- *   `reportWaitMs`. Shown again after the full page, the card is asked to
- *   measure itself.
+ *   height the host fixes. A card that has not reported after `reportWaitMs`
+ *   is folded to a line linking to its page (or framed at the view's `height`
+ *   when it sets one); a later report brings it back. Shown again after the
+ *   full page, the card is asked to measure itself.
  * - A card's request for the full page counts only right after a click in
  *   it: the view asks the host for the full screen, stays inline when it is
  *   refused, and opens the site's page only when the host has no full screen,
@@ -23,6 +24,8 @@ export function embedViewScript(settings: string): string {
   const settings = ${settings};
   const status = document.getElementById('status');
   const card = document.getElementById('card');
+  const note = document.getElementById('note');
+  const openButton = document.getElementById('open');
   const context = { displayMode: 'inline', availableDisplayModes: [], containerDimensions: {} };
   const pending = new Map();
   let nextId = 1;
@@ -31,6 +34,7 @@ export function embedViewScript(settings: string): string {
   let covered = false;
   let wanted = settings.loadingHeight;
   let heard = false;
+  let stalled = false;
   let waiting;
   let posted = -1;
   const post = (message) =>
@@ -73,6 +77,8 @@ export function embedViewScript(settings: string): string {
     }
     card.hidden = showPage;
     if (pageFrame) pageFrame.hidden = !showPage;
+    const quiet = stalled && !fullscreen();
+    note.hidden = !quiet;
     if (showPage) {
       covered = true;
     } else if (covered) {
@@ -88,10 +94,13 @@ export function embedViewScript(settings: string): string {
     const fixed = Number.isFinite(box.height) && box.height > 0;
     const limit = Number.isFinite(box.maxHeight) && box.maxHeight > 0 ? box.maxHeight : Infinity;
     const height = fixed ? box.height : Math.min(wanted, limit);
-    card.style.height = height + 'px';
-    if (height === posted) return;
-    posted = height;
-    post({ method: 'ui/notifications/size-changed', params: { height } });
+    // A card that did not report keeps a frame of no height, where it can
+    // still measure itself, under the line linking to its page.
+    card.style.height = (quiet ? 0 : height) + 'px';
+    const reported = quiet ? settings.stalledHeight : height;
+    if (reported === posted) return;
+    posted = reported;
+    post({ method: 'ui/notifications/size-changed', params: { height: reported } });
   };
   const siteAddress = () => {
     const url = new URL(shown.page || shown.url);
@@ -146,11 +155,13 @@ export function embedViewScript(settings: string): string {
     if (!shown || shown.url !== url) {
       card.setAttribute('src', url);
       heard = false;
+      stalled = false;
       wanted = settings.loadingHeight;
       clearTimeout(waiting);
       waiting = setTimeout(() => {
         if (heard) return;
-        wanted = settings.height;
+        if (settings.height === null) stalled = true;
+        else wanted = settings.height;
         layout();
       }, settings.reportWaitMs);
     }
@@ -163,6 +174,7 @@ export function embedViewScript(settings: string): string {
       // out (WebKit) measures its height.
       if (card.hidden && !(data.height > 0)) return;
       heard = true;
+      stalled = false;
       wanted = Math.min(Math.max(Math.ceil(data.height), settings.minHeight), settings.maxHeight);
       layout();
     } else if (data.type === settings.expandMessage) {
@@ -172,6 +184,9 @@ export function embedViewScript(settings: string): string {
       collapse();
     }
   };
+  openButton.addEventListener('click', () => {
+    if (shown) openSite();
+  });
   window.addEventListener('message', (event) => {
     const data = event.data;
     const fromPage = pageFrame !== null && event.source === pageFrame.contentWindow;

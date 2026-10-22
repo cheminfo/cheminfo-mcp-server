@@ -31,9 +31,14 @@ const MAX_HEIGHT = 4000;
 const LOADING_HEIGHT = 120;
 
 /**
- * How long a page has to report its height before it gets the default.
+ * How long a page has to report its height before it counts as not loaded.
  */
-const REPORT_WAIT_MS = 3000;
+const REPORT_WAIT_MS = 8000;
+
+/**
+ * The height of the line a card that did not load is folded to.
+ */
+const STALLED_HEIGHT = 44;
 
 /**
  * The shell page of an `embedView`: an MCP App (protocol 2026-01-26) that
@@ -47,18 +52,20 @@ const REPORT_WAIT_MS = 3000;
  * none. A `cheminfo:embed-collapse` message (Escape) leaves the full screen.
  * @param name - What the frame is called, for a screen reader.
  * @param origins - The origins it may frame.
- * @param height - The frame's height when the page never reports its own.
+ * @param height - The frame's height when the page never reports its own;
+ *   undefined folds such a card to a line linking to its page.
  * @returns The page.
  */
 export function embedViewHtml(
   name: string,
   origins: readonly string[],
-  height: number,
+  height?: number,
 ): string {
   const settings = JSON.stringify({
     name,
     origins,
-    height,
+    height: height ?? null,
+    stalledHeight: STALLED_HEIGHT,
     key: EMBED_META_KEY,
     allow: FRAME_ALLOW,
     heightMessage: EMBED_HEIGHT_MESSAGE,
@@ -84,10 +91,12 @@ html, body { margin: 0; padding: 0; overflow: hidden; background: transparent; }
 iframe { display: block; width: 100%; border: 0; }
 iframe[hidden] { display: none; }
 p { margin: 12px; color: #5b6875; font: 14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+button { padding: 0; border: 0; background: none; color: #16202c; font: inherit; text-decoration: underline; cursor: pointer; }
 </style>
 </head>
 <body>
 <p id="status">Loading…</p>
+<p id="note" hidden>The card did not load. <button id="open" type="button">Open the page</button></p>
 <iframe id="card" title="${escapeText(name)}" allow="${FRAME_ALLOW}" hidden></iframe>
 <script>
 ${embedViewScript(settings)}

@@ -4,11 +4,6 @@ import { EMBED_META_KEY, embedViewHtml } from './embedViewShell.ts';
 export { EMBED_META_KEY, embedViewHtml } from './embedViewShell.ts';
 
 /**
- * The height of the frame of a page that never reports its own, in pixels.
- */
-const DEFAULT_HEIGHT = 640;
-
-/**
  * Options of {@link embedView}.
  */
 export interface EmbedViewOptions {
@@ -33,9 +28,11 @@ export interface EmbedViewOptions {
    */
   description?: string;
   /**
-   * The height of the frame, in pixels, when the page never reports its own
+   * The height of the frame, in pixels, for a page that cannot report its own
    * with a `cheminfo:embed-height` message (see `cheminfo-mcp-server/embed`).
-   * @default 640
+   * @default undefined - a page that has not reported its height after 8 s
+   *   is taken as not loaded: it is folded to a line linking to its page, and
+   *   comes back when it reports
    */
   height?: number;
 }
@@ -68,7 +65,7 @@ export interface EmbedMetaOptions {
  * @returns The resource, for `createToolRoutes({ resources })`.
  */
 export function embedView(options: EmbedViewOptions): AppResource {
-  const { uri, name, origins, description, height = DEFAULT_HEIGHT } = options;
+  const { uri, name, origins, description, height } = options;
   return {
     uri,
     name,

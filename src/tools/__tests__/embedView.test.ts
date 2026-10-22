@@ -26,7 +26,7 @@ test('the view frames the site and nothing else, and passes on the clipboard', (
   expect(html).toContain(
     '"origins":["https://equilibrium.cheminfo.org","http://localhost:10602"]',
   );
-  expect(html).toContain('"height":640');
+  expect(html).toContain('"height":null');
   expect(html).toContain(
     '<iframe id="card" title="equilibrium.cheminfo.org" allow="fullscreen *; clipboard-write *" hidden></iframe>',
   );

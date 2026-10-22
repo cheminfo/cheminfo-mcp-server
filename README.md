@@ -202,8 +202,10 @@ and `embedMeta(card, { page })` is what an answer carries for it to show.
   reports, never taller than the host allows (`containerDimensions.maxHeight`),
   so nothing scrolls twice. A host that fixes the height
   (`containerDimensions.height`) gets a frame of that height, in which the card
-  scrolls. A card that does not report within 3 s is framed at `height`
-  (640 px).
+  scrolls. A card that has not reported after 8 s is taken as not loaded: it
+  is folded to one line, "The card did not load. Open the page", and comes
+  back as soon as it reports. A view whose page cannot report sets `height`,
+  and such a page is then framed at that height.
 - **Over the full screen, the full page.** `page` is the whole page, shown when
   the user asks for more: from the host's own control, or from the card. It is
   loaded on first use and kept. When the card is shown again, the view asks it
