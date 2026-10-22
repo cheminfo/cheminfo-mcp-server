@@ -1,17 +1,17 @@
 # cheminfo-mcp-server
 
-Serve tools to MCP clients and to the cheminfo chat from one definition, with the structures, reaction schemes, spectra and files they produce carried beside the answer, never through the model.
+Serve tools to MCP clients and to the cheminfo chat from one definition, with the structures, reaction schemes, spectra, curves and files they produce carried beside the answer, never through the model.
 
 One tool definition gives a server these routes:
 
-| Route                      | For                  | Answers                                                                                        |
-| -------------------------- | -------------------- | ---------------------------------------------------------------------------------------------- |
-| `GET tools`                | the chat, any client | the catalog: each tool's name, title, description, JSON Schema, hints and `_meta`              |
-| `POST tools/{name}`        | the chat, the page   | `{ result, molecules, reactions?, spectra?, files?, structuredContent?, _meta? }`              |
-| `POST mcp`                 | MCP clients          | MCP's Streamable HTTP, stateless: a server per request, JSON answers                           |
-| `GET`, `DELETE mcp`        | MCP clients          | 405 with `Allow: POST`: no session is kept                                                     |
-| `GET resources`            | a host speaking JSON | the MCP Apps the answers are drawn with, and the version of each                               |
-| `GET resources/read?uri=…` | a host speaking JSON | one MCP App's page, as MCP's resources/read answers it, with its version as ETag (304 if held) |
+| Route                      | For                  | Answers                                                                                                      |
+| -------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `GET tools`                | the chat, any client | the catalog: each tool's name, title, description, JSON Schema, hints and `_meta`, and the example questions |
+| `POST tools/{name}`        | the chat, the page   | `{ result, molecules, reactions?, spectra?, curves?, files?, structuredContent?, _meta? }`                   |
+| `POST mcp`                 | MCP clients          | MCP's Streamable HTTP, stateless: a server per request, JSON answers                                         |
+| `GET`, `DELETE mcp`        | MCP clients          | 405 with `Allow: POST`: no session is kept                                                                   |
+| `GET resources`            | a host speaking JSON | the MCP Apps the answers are drawn with, and the version of each                                             |
+| `GET resources/read?uri=…` | a host speaking JSON | one MCP App's page, as MCP's resources/read answers it, with its version as ETag (304 if held)               |
 
 `result` is what the model reads. The other fields are drawn by the page or the chat beside it. An MCP client has no such side channel, so MCP answers the result as JSON text, then the content of each file the tool produced, with `structuredContent` and `_meta` for a view.
 
@@ -191,6 +191,180 @@ const resources = (request) =>
 - `registerViewAssets()` serves those files to any origin, without credentials, cached for a year; anything else under the prefix is a 404, never a page. `root` and `retainDirectory` may be relative to the working directory. `retainDirectory` keeps the assets of earlier builds for `retainDays` (30), so a view opened before a deploy still finds its chunks; it must hold nothing else, since a file no build has had for that long is deleted.
 - With `loader: true` on both, the page loads `<assets>/loader.js` (`VIEW_LOADER_FILE`), whose name never changes and which is asked again every time (`VIEW_LOADER_CACHE_CONTROL`), and the loader (`viewLoaderScript()`) imports the current hashed entry. The page then never changes with the build, so a host that keeps it (a card reopened from an old conversation) still loads the current one after a deploy.
 
+### A site's own page as the view
+
+A site whose page already draws the answer, at an address under `?embed=1`,
+needs no view of its own: `embedView` is a small MCP App that frames that page,
+and `embedMeta(card, { page })` is what an answer carries for it to show.
+
+- **Inline, the card.** `card` is a small page drawing only what the question
+  asked (usually the page with `card=1`). The frame is as tall as the card
+  reports, never taller than the host allows (`containerDimensions.maxHeight`),
+  so nothing scrolls twice. A host that fixes the height
+  (`containerDimensions.height`) gets a frame of that height, in which the card
+  scrolls. A card that does not report within 3 s is framed at `height`
+  (640 px).
+- **Over the full screen, the full page.** `page` is the whole page, shown when
+  the user asks for more: from the host's own control, or from the card. It is
+  loaded on first use and kept. When the card is shown again, the view asks it
+  for its height, which may have changed while it was hidden.
+
+The view frames exactly the http(s) addresses it checked, of the origins it
+names. It asks the host for the clipboard (`permissions.clipboardWrite`) and
+passes it on, with the full screen, to the card and the page, so their own copy
+and full-screen buttons work wherever the host grants both to the view.
+
+```ts
+import { createToolRoutes, embedMeta, embedView } from 'cheminfo-mcp-server';
+
+const titration = defineTool({
+  name: 'titrationCurve',
+  // …
+  ui: { resourceUri: 'ui://equilibrium/page' },
+  execute: (args) => {
+    const page = `https://equilibrium.cheminfo.org/titration?${query(args)}&embed=1`;
+    return {
+      result: computeTitration(args),
+      meta: embedMeta(`${page}&card=1`, { page }),
+    };
+  },
+});
+
+createToolRoutes({
+  name: 'equilibrium',
+  version,
+  tools: [titration],
+  resources: [
+    embedView({
+      uri: 'ui://equilibrium/page',
+      name: 'equilibrium.cheminfo.org',
+      origins: ['https://equilibrium.cheminfo.org'],
+    }),
+  ],
+});
+```
+
+The card speaks to its view with `cheminfo-mcp-server/embed`, which has no
+dependency and runs in the browser:
+
+```tsx
+import {
+  isFramed,
+  reportEmbedHeight,
+  requestEmbedExpand,
+} from 'cheminfo-mcp-server/embed';
+import { useEffect, useRef } from 'react';
+
+export function AnswerCard() {
+  const cardRef = useRef<HTMLDivElement>(null);
+  // The frame fits the card: measure the element holding all of it. A ref not
+  // attached yet reports nothing.
+  useEffect(() => reportEmbedHeight(cardRef.current), []);
+
+  // "Full page": the full screen, else the site's page in a new tab.
+  function showFullPage() {
+    if (isFramed()) requestEmbedExpand();
+    else location.href = fullPageAddress;
+  }
+  return (
+    <div ref={cardRef}>
+      …<button onClick={showFullPage}>Full page</button>
+    </div>
+  );
+}
+```
+
+`requestEmbedExpand()` belongs in a click handler: the view acts on it only
+while the click's activation lasts, so a card can never open anything by
+itself. The view then asks the host for the full screen, and when the host
+refuses, the card stays inline, the host's own control still at hand. It opens
+the site's page in a new tab (`ui/open-link`, which a host confirms with the
+user) only when the host has no full screen, or when the full screen already
+shows the card because the answer has no `page`.
+
+#### The page inside a chat
+
+A chat draws the view in a sandboxed frame, and every frame inside it inherits
+the sandbox: the card and the page run in an opaque origin (`origin` is
+`'null'`). `installEmbedPage()` prepares a framed page for it, and does nothing
+in a page opened on its own:
+
+```ts
+// src/embedPage.ts
+import { installEmbedPage } from 'cheminfo-mcp-server/embed';
+
+installEmbedPage();
+```
+
+```ts
+// src/main.ts: imported first, so it runs before any other module
+import './embedPage.ts';
+import { App } from './App.tsx';
+```
+
+It must run before any module that makes a worker or changes the address is
+evaluated. A module's static imports are all evaluated before its first
+statement, so a call at the top of the entry module comes too late when one of
+its imports starts a worker: call it in a module of its own that the entry
+imports first, as above, or call it and then import the app dynamically
+(`await import('./start.tsx')`).
+
+What a framed page can and cannot do:
+
+- **Storage throws.** `localStorage`, `sessionStorage` and IndexedDB throw in an
+  opaque origin: use them in a `try`, and work without them.
+- **Every request is cross-origin.** The site's server sends
+  `Access-Control-Allow-Origin: *` on the built assets (module scripts load with
+  CORS), on what the page fetches, and on what its workers load.
+- **Workers** start from a `data:` URL (`installSandboxWorkers()`): the address
+  given to `new Worker()` resolves against the document's base URL, and inside
+  the worker a relative `fetch()`, `XMLHttpRequest` or `importScripts()`
+  resolves against the real script. `self.location` stays the `data:` URL, so
+  what is built from it fails, such as the asset addresses of Vite's default
+  `iife` worker format, which rewrites `import.meta.url` to
+  `self.location.href`. Use module workers (`type: 'module'`, Vite
+  `worker.format: 'es'`), whose `import.meta.url` is the script's own address.
+  A `blob:` worker is started as it is, and a module one does not run in
+  Chromium.
+- **History in Safari.** WebKit lets a page in an opaque origin change only its
+  query and fragment with `history.pushState()` and `replaceState()`;
+  `installSandboxHistory()` navigates to an address it refuses instead, and the
+  page loads again there, without the state it was given. Name the card and the
+  page by their final paths, and keep the moves inside a framed page to the
+  query.
+- **Copy and full screen** work in the card and the page once the host grants
+  them to the view.
+- **Escape** in the card or the page leaves the full screen: the page forwards
+  it (`cheminfo:embed-collapse`) unless the page prevented it, or one of its
+  dialogs (`[aria-modal="true"]`) is open.
+
+In a frame, `installEmbedPage()` forwards Escape and calls
+`installSandboxWorkers()` and `installSandboxHistory()`, which act in an opaque
+origin only; both are exported on their own too.
+
+### Example questions
+
+`examples` lists questions the tools answer, with what a correct answer
+contains. `GET tools` returns them, so a chat shows them to its users and a
+benchmark asks them again; a server without examples keeps the catalog, and its
+version, it had.
+
+```ts
+createToolRoutes({
+  name: 'equilibrium',
+  version,
+  tools,
+  examples: [
+    {
+      question: 'What is the pH of 0.1 M acetic acid?',
+      expect: '2.85',
+      tools: ['solutionPh'],
+      category: 'Solutions',
+    },
+  ],
+});
+```
+
 ### A bridge
 
 A server that serves another server's tools again, such as an MCP server over stdio, passes their views on: each forwarded tool takes `meta: entry._meta` from the catalog, returns the call's `structuredContent` and `_meta` as its own, and each resource is `forwardAppResource(listing, readHtml)`, its page read from the other server whenever a host reads it. `createMcpServer({ name, version, tools, resources, context })` builds that MCP server; its `resources` may also be its own.
@@ -220,7 +394,7 @@ Every reply is checked against the contract. A malformed side channel is dropped
 
 ## The contract
 
-`cheminfo-mcp-server/contract` holds the zod schemas and types every side shares: `ToolCatalogSchema`, `ToolRunReplySchema`, `ErrorReplySchema`, `DisplayMoleculeSchema`, `DisplayReactionSchema`, `DisplaySpectrumSchema` and `DisplayFileSchema`, with their limits (`MAX_MOLECULES`, `MAX_REACTIONS`, `MAX_SPECTRA`, `MAX_FILES`), and for views `ResourceListSchema`, `ResourceReadSchema`, `ToolUiSchema`, `AppCspSchema`, `AppPermissionsSchema`, `AppResourceUiSchema`, `APP_MIME_TYPE`, `toolVisibility()`, `isModelVisible()`, `isAppVisible()` and `toCallToolResult()`. The `_meta` fields are lenient: a field this version does not know is kept. A visibility value this version does not know is never read as `model`.
+`cheminfo-mcp-server/contract` holds the zod schemas and types every side shares: `ToolCatalogSchema` (with `ToolExampleSchema`), `ToolRunReplySchema`, `ErrorReplySchema`, `DisplayMoleculeSchema`, `DisplayReactionSchema`, `DisplaySpectrumSchema`, `DisplayCurveSchema` (a titration curve: two axes of equal length, each with its title, readout symbol, decimals and an optional fixed range) and `DisplayFileSchema`, with their limits (`MAX_MOLECULES`, `MAX_REACTIONS`, `MAX_SPECTRA`, `MAX_CURVES`, `MAX_CURVE_POINTS`, `MAX_FILES`), and for views `ResourceListSchema`, `ResourceReadSchema`, `ToolUiSchema`, `AppCspSchema`, `AppPermissionsSchema`, `AppResourceUiSchema`, `APP_MIME_TYPE`, `toolVisibility()`, `isModelVisible()`, `isAppVisible()` and `toCallToolResult()`. The `_meta` fields are lenient: a field this version does not know is kept. A visibility value this version does not know is never read as `model`.
 
 ## License
 

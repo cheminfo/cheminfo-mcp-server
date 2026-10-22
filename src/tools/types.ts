@@ -1,6 +1,7 @@
 import type { ZodObject, ZodRawShape, core, z } from 'zod';
 
 import type {
+  DisplayCurve,
   DisplayFile,
   DisplayMolecule,
   DisplayReaction,
@@ -40,6 +41,11 @@ export interface ToolAnswer {
    * @default []
    */
   spectra?: DisplaySpectrum[];
+  /**
+   * Curves to draw, such as a titration curve; at most 8 are kept.
+   * @default []
+   */
+  curves?: DisplayCurve[];
   /**
    * Files to offer; at most 8 are kept.
    * @default []

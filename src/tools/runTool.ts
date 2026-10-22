@@ -1,5 +1,6 @@
 import type { ToolRunReply } from '../contract/index.ts';
 import {
+  MAX_CURVES,
   MAX_FILES,
   MAX_MOLECULES,
   MAX_REACTIONS,
@@ -164,6 +165,8 @@ function replyOf(answer: ToolAnswer): ToolRunReply {
   if (reactions.length > 0) reply.reactions = reactions;
   const spectra = (answer.spectra ?? []).slice(0, MAX_SPECTRA);
   if (spectra.length > 0) reply.spectra = spectra;
+  const curves = (answer.curves ?? []).slice(0, MAX_CURVES);
+  if (curves.length > 0) reply.curves = curves;
   const files = (answer.files ?? []).slice(0, MAX_FILES);
   if (files.length > 0) reply.files = files;
   if (answer.structuredContent !== undefined) {

@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
+import type { ToolExample } from '../contract/index.ts';
 import type { ContextResolution } from '../mcp/createMcpServer.ts';
 import type { AppResourceList } from '../tools/apps.ts';
 import type { ToolList, ToolRefusal } from '../tools/types.ts';
@@ -102,6 +103,12 @@ export interface ToolRoutesBaseOptions<Context> {
    */
   instructions?: string;
   tools: ToolList<Context>;
+  /**
+   * Questions the tools answer, with what a correct answer contains: `GET
+   * tools` lists them, for a chat to show and a benchmark to ask.
+   * @default []
+   */
+  examples?: readonly ToolExample[];
   /**
    * The MCP Apps the tools' answers are drawn with, or a function giving
    * them for a request (their assets may be served from its origin): MCP's

@@ -38,6 +38,13 @@ export {
   uniqueResources,
 } from './tools/apps.ts';
 export { buildToolCatalog, toolMetaOf } from './tools/catalog.ts';
+export type { EmbedMetaOptions, EmbedViewOptions } from './tools/embedView.ts';
+export {
+  EMBED_META_KEY,
+  embedMeta,
+  embedView,
+  embedViewHtml,
+} from './tools/embedView.ts';
 export { contentVersion } from './tools/contentVersion.ts';
 export type { ToolArgumentsParse } from './tools/parseToolArguments.ts';
 export {

@@ -62,8 +62,12 @@ export function createToolRoutes<Context>(
   let staticCatalog: Promise<ToolCatalog> | undefined;
   const catalog = () =>
     typeof options.tools === 'function'
-      ? buildToolCatalog(options.tools(), instructions)
-      : (staticCatalog ??= buildToolCatalog(options.tools, instructions));
+      ? buildToolCatalog(options.tools(), instructions, options.examples)
+      : (staticCatalog ??= buildToolCatalog(
+          options.tools,
+          instructions,
+          options.examples,
+        ));
   const runOptions = (request: FastifyRequest) =>
     requestRunOptions(request, options);
 
@@ -96,7 +100,7 @@ export function createToolRoutes<Context>(
             tags: ['tools'],
             summary: 'Run one tool',
             description:
-              'The body holds the arguments. The answer is `result`, what the model reads, and the structures, schemes, spectra and files drawn beside it.',
+              'The body holds the arguments. The answer is `result`, what the model reads, and the structures, schemes, spectra, curves and files drawn beside it.',
             params: {
               type: 'object',
               properties: { name: { type: 'string' } },

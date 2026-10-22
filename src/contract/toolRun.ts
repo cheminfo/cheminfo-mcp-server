@@ -1,10 +1,12 @@
 import { z } from 'zod';
 
 import {
+  DisplayCurveSchema,
   DisplayFileSchema,
   DisplayMoleculeSchema,
   DisplayReactionSchema,
   DisplaySpectrumSchema,
+  MAX_CURVES,
   MAX_FILES,
   MAX_MOLECULES,
   MAX_REACTIONS,
@@ -27,6 +29,11 @@ export const ToolRunReplySchema = z.object({
   spectra: z
     .array(DisplaySpectrumSchema)
     .max(MAX_SPECTRA)
+    .optional()
+    .catch(undefined),
+  curves: z
+    .array(DisplayCurveSchema)
+    .max(MAX_CURVES)
     .optional()
     .catch(undefined),
   files: z.array(DisplayFileSchema).max(MAX_FILES).optional().catch(undefined),

@@ -20,6 +20,14 @@ export const MAX_SPECTRA = 8;
  * Files offered at most for one tool call.
  */
 export const MAX_FILES = 8;
+/**
+ * Curves drawn at most for one tool call.
+ */
+export const MAX_CURVES = 8;
+/**
+ * Points kept at most on one curve.
+ */
+export const MAX_CURVE_POINTS = 100_000;
 
 const Field = z.string().max(MAX_DISPLAY_FIELD);
 
@@ -57,6 +65,51 @@ export const DisplaySpectrumSchema = z.object({
 });
 
 /**
+ * One axis of a curve: what it measures, how the readout names a value, and
+ * the values themselves.
+ */
+export const DisplayCurveAxisSchema = z.object({
+  /**
+   * What the axis measures, with its unit, e.g. `Volume of HCl added (mL)`.
+   */
+  title: z.string().min(1),
+  /**
+   * What the readout names a value by, e.g. `V` or `pH`.
+   */
+  symbol: z.string(),
+  /**
+   * The unit the readout writes after a value, e.g. `mL`.
+   */
+  unit: z.string().optional(),
+  /**
+   * How many decimals the readout writes.
+   */
+  decimals: z.number().int().min(0).max(12),
+  /**
+   * One value per point.
+   */
+  values: z.array(z.number()).max(MAX_CURVE_POINTS),
+  /**
+   * The range shown when the curve is fitted, e.g. `[0, 14]` for a pH.
+   */
+  range: z.tuple([z.number(), z.number()]).optional(),
+});
+
+/**
+ * A curve to draw, such as a titration curve: one y value per x value, the x
+ * values ascending.
+ */
+export const DisplayCurveSchema = z
+  .object({
+    title: z.string().min(1),
+    x: DisplayCurveAxisSchema,
+    y: DisplayCurveAxisSchema,
+  })
+  .refine((curve) => curve.x.values.length === curve.y.values.length, {
+    message: 'a curve has one y value per x value',
+  });
+
+/**
  * A text file a tool produced, offered as it is with copy and download.
  */
 export const DisplayFileSchema = z.object({
@@ -77,6 +130,14 @@ export type DisplayReaction = z.infer<typeof DisplayReactionSchema>;
  * A spectrum to draw beside a tool's answer.
  */
 export type DisplaySpectrum = z.infer<typeof DisplaySpectrumSchema>;
+/**
+ * One axis of a curve drawn beside a tool's answer.
+ */
+export type DisplayCurveAxis = z.infer<typeof DisplayCurveAxisSchema>;
+/**
+ * A curve drawn beside a tool's answer.
+ */
+export type DisplayCurve = z.infer<typeof DisplayCurveSchema>;
 /**
  * A file offered beside a tool's answer.
  */

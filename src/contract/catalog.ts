@@ -45,6 +45,36 @@ export const CatalogToolSchema = z.object({
   _meta: z.record(z.string(), z.unknown()).optional(),
 });
 
+const ExpectedText = z.string().min(1);
+
+/**
+ * A question the tools answer, with what a correct answer contains: shown to
+ * people as an example, and asked again by a benchmark.
+ */
+export const ToolExampleSchema = z.object({
+  /**
+   * The question, as a person asks it.
+   */
+  question: z.string().min(1),
+  /**
+   * Text a correct answer contains, or every one of several texts, ignoring
+   * case.
+   */
+  expect: z.union([ExpectedText, z.array(ExpectedText).min(1)]),
+  /**
+   * The answer is only right when at least one of these tools was called.
+   */
+  tools: z.array(z.string().min(1)).min(1),
+  /**
+   * Text a correct answer must not contain, e.g. a value not asked for.
+   */
+  reject: z.string().min(1).optional(),
+  /**
+   * The heading it is listed under, e.g. `Solutions`.
+   */
+  category: z.string().min(1).optional(),
+});
+
 /**
  * `GET tools`: the same for every caller.
  */
@@ -58,8 +88,18 @@ export const ToolCatalogSchema = z.object({
    * What the model is told about the tools as a whole.
    */
   instructions: z.string(),
+  /**
+   * Questions the tools answer, for people and for a benchmark. Only people
+   * and benchmarks read them, so a malformed list is dropped, never the
+   * catalog.
+   */
+  examples: z.array(ToolExampleSchema).optional().catch(undefined),
 });
 
+/**
+ * A question the tools answer, with what a correct answer contains.
+ */
+export type ToolExample = z.infer<typeof ToolExampleSchema>;
 /**
  * One tool of a catalog.
  */
