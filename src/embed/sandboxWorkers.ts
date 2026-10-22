@@ -1,3 +1,5 @@
+import { workerBootstrapSource } from './workerBootstrap.ts';
+
 /**
  * What the bootstrap reads of a worker's options.
  */
@@ -51,6 +53,7 @@ export interface SandboxScope {
 }
 
 const installed = new WeakSet<object>();
+const bootstraps = new Map<string, string>();
 
 /**
  * Let a page framed by an `embedView` start its workers. A chat draws the view
@@ -59,18 +62,27 @@ const installed = new WeakSet<object>();
  * `new Worker(url)` fails for any http(s) script (Chromium throws "cannot be
  * accessed from origin 'null'", Firefox and WebKit fire an error event).
  *
- * In such a page, and only there, every worker is started from a `data:` URL
- * (see {@link workerBootstrapUrl}) that rebases the worker's relative loads on
- * the real script's address, then runs that script. A relative address
- * resolves against the document's base URL when the worker is made. Inside
- * the worker `self.location` is the `data:` URL, so an address built from it
- * still fails, as do those of Vite's default `iife` worker format, which
- * rewrites `import.meta.url` to `self.location.href`. Use module workers
- * (`type: 'module'`, Vite `worker.format: 'es'`), whose `import.meta.url` is
- * the script's own address. A `blob:` worker is started as it is: a module
- * one does not run in Chromium. The site serves the scripts and what they
- * fetch with `Access-Control-Allow-Origin: *`, as the requests come from an
- * opaque origin.
+ * In such a page, and only there, every worker is started as a classic worker
+ * from a `blob:` URL (see {@link workerBootstrapUrl}), which runs in the
+ * page's own origin. Its script rebases the worker's relative loads on the
+ * real script's address, then runs that script: a classic one with
+ * `importScripts`, a module with a dynamic `import()`, the messages posted
+ * before the module listens being held, then delivered. Neither a `data:`
+ * worker, whose origin is a new opaque one, nor a module `blob:` one would
+ * do: in a `data:` worker WebKit refuses to read any `Blob` (`stream()`,
+ * `arrayBuffer()`, `text()`, `FileReader`, a `blob:` URL fetched), and
+ * Chromium never runs a module worker from a `blob:` URL in an opaque origin.
+ *
+ * A relative address resolves against the document's base URL when the
+ * worker is made. Inside the worker `self.location` is the `blob:` URL, so an
+ * address built from it still fails, as do those of Vite's default `iife`
+ * worker format, which rewrites `import.meta.url` to `self.location.href`. Use
+ * module workers (`type: 'module'`, Vite `worker.format: 'es'`), whose
+ * `import.meta.url` is the script's own address. A `data:` or `blob:` worker
+ * is started as it is: a module `blob:` one does not run in Chromium. The
+ * site serves the scripts and what they fetch with
+ * `Access-Control-Allow-Origin: *`, as the requests come from an opaque
+ * origin.
  *
  * Call it before any module that makes a worker is evaluated (see
  * `installEmbedPage`). Anywhere else it does nothing.
@@ -90,7 +102,7 @@ export function installSandboxWorkers(
   class SandboxWorker extends NativeWorker {
     constructor(url: string | URL, options?: SandboxWorkerOptions) {
       const base = scope.document?.baseURI ?? scope.location?.href;
-      super(workerBootstrapUrl(url, options, base), options);
+      super(...workerArguments(url, options, base));
     }
   }
   installed.add(SandboxWorker);
@@ -98,11 +110,11 @@ export function installSandboxWorkers(
 }
 
 /**
- * The address a worker is started from in an opaque origin: a `data:` URL
- * whose script first makes `fetch`, `XMLHttpRequest` and `importScripts`
- * resolve a relative address against the real script's, then runs that
- * script by its absolute address: a module imports it, a classic script calls
- * `importScripts`. A `data:` or `blob:` address is kept as it is.
+ * The address a worker is started from in an opaque origin: a `blob:` URL of
+ * the classic script that runs the worker's own (see
+ * {@link installSandboxWorkers}), made once per script and kept for the
+ * page's lifetime. A worker started from it is a classic one, whatever its
+ * `type`. A `data:` or `blob:` address is kept as it is.
  * @param url - The worker's script, as the page names it.
  * @param options - The worker's options.
  * @param base - The address against which a relative one resolves.
@@ -113,48 +125,32 @@ export function workerBootstrapUrl(
   options: SandboxWorkerOptions = {},
   base?: string,
 ): string {
+  return workerArguments(url, options, base)[0];
+}
+
+/**
+ * What a worker is started with in an opaque origin.
+ * @param url - The worker's script, as the page names it.
+ * @param options - The worker's options.
+ * @param base - The address against which a relative one resolves.
+ * @returns The address to start the worker from, and its options.
+ */
+function workerArguments(
+  url: string | URL,
+  options: SandboxWorkerOptions | undefined,
+  base: string | undefined,
+): [string, SandboxWorkerOptions | undefined] {
   const href = new URL(String(url), base).href;
-  if (href.startsWith('data:') || href.startsWith('blob:')) return href;
-  const patch = rebasePatch(href);
-  const script = JSON.stringify(href);
-  const source =
-    options.type === 'module'
-      ? `import ${JSON.stringify(dataUrl(patch))};\nimport ${script};`
-      : `{\n${patch}\nconst nativeImportScripts = importScripts;\nglobalThis.importScripts = (...urls) => nativeImportScripts(...urls.map(rebase));\n}\nimportScripts(${script});`;
-  return dataUrl(source);
-}
-
-/**
- * The script that makes a worker's relative loads resolve against its real
- * address rather than against its `data:` URL.
- * @param href - The worker script's absolute address.
- * @returns The script, which leaves `rebase` in its scope.
- */
-function rebasePatch(href: string): string {
-  return `const base = ${JSON.stringify(href)};
-const rebase = (url) => {
-  if (typeof url !== 'string') return url;
-  try {
-    return new URL(url, base).href;
-  } catch {
-    return url;
+  if (href.startsWith('data:') || href.startsWith('blob:')) {
+    return [href, options];
   }
-};
-const nativeFetch = globalThis.fetch;
-globalThis.fetch = (input, init) => nativeFetch(rebase(input), init);
-if (typeof XMLHttpRequest === 'function') {
-  const nativeOpen = XMLHttpRequest.prototype.open;
-  XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-    return nativeOpen.call(this, method, rebase(url), ...rest);
-  };
-}`;
-}
-
-/**
- * The address of a script given in full.
- * @param source - The script.
- * @returns Its `data:` URL.
- */
-function dataUrl(source: string): string {
-  return `data:text/javascript,${encodeURIComponent(source)}`;
+  const source = workerBootstrapSource(href, options?.type === 'module');
+  let bootstrap = bootstraps.get(source);
+  if (bootstrap === undefined) {
+    bootstrap = URL.createObjectURL(
+      new Blob([source], { type: 'text/javascript' }),
+    );
+    bootstraps.set(source, bootstrap);
+  }
+  return [bootstrap, { ...options, type: 'classic' }];
 }

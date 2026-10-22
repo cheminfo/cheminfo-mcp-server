@@ -317,16 +317,20 @@ What a framed page can and cannot do:
 - **Every request is cross-origin.** The site's server sends
   `Access-Control-Allow-Origin: *` on the built assets (module scripts load with
   CORS), on what the page fetches, and on what its workers load.
-- **Workers** start from a `data:` URL (`installSandboxWorkers()`): the address
-  given to `new Worker()` resolves against the document's base URL, and inside
-  the worker a relative `fetch()`, `XMLHttpRequest` or `importScripts()`
-  resolves against the real script. `self.location` stays the `data:` URL, so
-  what is built from it fails, such as the asset addresses of Vite's default
-  `iife` worker format, which rewrites `import.meta.url` to
-  `self.location.href`. Use module workers (`type: 'module'`, Vite
-  `worker.format: 'es'`), whose `import.meta.url` is the script's own address.
-  A `blob:` worker is started as it is, and a module one does not run in
-  Chromium.
+- **Workers** start as classic workers from a `blob:` URL, in the page's own
+  origin (`installSandboxWorkers()`). The address given to `new Worker()`
+  resolves against the document's base URL. A module is run by a dynamic
+  `import()`, and the messages posted before it listens are held, then
+  delivered. Inside the worker a relative `fetch()`, `XMLHttpRequest` or
+  `importScripts()` resolves against the real script, and a `Blob` can be read,
+  which WebKit refuses in a worker started from a `data:` URL.
+  `self.location` is the `blob:` URL, so what is built from it fails, such as
+  the asset addresses of Vite's default `iife` worker format, which rewrites
+  `import.meta.url` to `self.location.href`. Use module workers
+  (`type: 'module'`, Vite `worker.format: 'es'`), whose `import.meta.url` is
+  the script's own address. A `data:` or `blob:` worker is started as it is,
+  and a module `blob:` one does not run in Chromium. Firefox refuses a worker's
+  `fetch()` of a `blob:` URL: read the `Blob` itself.
 - **History in Safari.** WebKit lets a page in an opaque origin change only its
   query and fragment with `history.pushState()` and `replaceState()`;
   `installSandboxHistory()` navigates to an address it refuses instead, and the
