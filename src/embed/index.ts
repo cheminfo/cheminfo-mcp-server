@@ -36,3 +36,9 @@ export type {
   WorkerConstructor,
 } from './sandboxWorkers.ts';
 export { installSandboxWorkers, workerBootstrapUrl } from './sandboxWorkers.ts';
+export type {
+  OpenedWindow,
+  SitePageOpening,
+  SitePageScope,
+} from './sitePage.ts';
+export { openSitePage } from './sitePage.ts';

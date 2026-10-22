@@ -248,11 +248,7 @@ The card speaks to its view with `cheminfo-mcp-server/embed`, which has no
 dependency and runs in the browser:
 
 ```tsx
-import {
-  isFramed,
-  reportEmbedHeight,
-  requestEmbedExpand,
-} from 'cheminfo-mcp-server/embed';
+import { openSitePage, reportEmbedHeight } from 'cheminfo-mcp-server/embed';
 import { useEffect, useRef } from 'react';
 
 export function AnswerCard() {
@@ -261,18 +257,21 @@ export function AnswerCard() {
   // attached yet reports nothing.
   useEffect(() => reportEmbedHeight(cardRef.current), []);
 
-  // "Full page": the full screen, else the site's page in a new tab.
-  function showFullPage() {
-    if (isFramed()) requestEmbedExpand();
-    else location.href = fullPageAddress;
-  }
   return (
     <div ref={cardRef}>
-      …<button onClick={showFullPage}>Full page</button>
+      …<button onClick={() => openSitePage(sitePageAddress)}>Details</button>
     </div>
   );
 }
 ```
+
+`openSitePage(url)` shows the site's own page, the card's address without
+its card, `embed` and `hide` parameters. Framed by a chat it opens a new
+window, so the conversation stays where it was; the window is opened without
+`noopener` (which would make `open` return null even when it worked) and its
+`opener` is cleared at once. When the host refuses the window, because its
+frames allow no popup, it falls back to `requestEmbedExpand()`. A card opened
+on its own goes to the page in place.
 
 `requestEmbedExpand()` belongs in a click handler: the view acts on it only
 while the click's activation lasts, so a card can never open anything by
