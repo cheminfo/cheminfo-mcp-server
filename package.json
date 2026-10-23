@@ -17,6 +17,8 @@
     "./client": "./lib/client/index.js",
     "./contract": "./lib/contract/index.js",
     "./embed": "./lib/embed/index.js",
+    "./testing": "./lib/testing/index.js",
+    "./threads": "./lib/threads/index.js",
     "./views": "./lib/views/index.js"
   },
   "files": [
@@ -41,11 +43,19 @@
   },
   "peerDependencies": {
     "@fastify/static": "^10.1.6",
+    "@fastify/swagger": "^9.9.2",
+    "@fastify/swagger-ui": "^6.1.2",
     "fastify": "^5.12.7",
     "zod": "^4.6.7"
   },
   "peerDependenciesMeta": {
     "@fastify/static": {
+      "optional": true
+    },
+    "@fastify/swagger": {
+      "optional": true
+    },
+    "@fastify/swagger-ui": {
       "optional": true
     },
     "fastify": {
@@ -54,6 +64,8 @@
   },
   "devDependencies": {
     "@fastify/static": "^10.1.6",
+    "@fastify/swagger": "^9.9.2",
+    "@fastify/swagger-ui": "^6.1.2",
     "@types/node": "^26.6.5",
     "@vitest/coverage-v8": "^5.0.5",
     "@zakodium/tsconfig": "^1.0.5",

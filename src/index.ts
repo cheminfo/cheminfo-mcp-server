@@ -8,6 +8,8 @@ export type {
   ToolRoutesOptions,
   ToolRoutesSettings,
 } from './fastify/options.ts';
+export type { ToolApiDocumentation } from './fastify/registerToolApi.ts';
+export { registerToolApi } from './fastify/registerToolApi.ts';
 export type { RouteDocumentation } from './fastify/replies.ts';
 export {
   isEtagHeld,
@@ -46,6 +48,14 @@ export {
   embedViewHtml,
 } from './tools/embedView.ts';
 export { contentVersion } from './tools/contentVersion.ts';
+export type { RefusalCode } from './tools/refusals.ts';
+export {
+  REFUSAL_CODES,
+  refuseBusy,
+  refuseInvalid,
+  refuseNotFound,
+  refuseTimeout,
+} from './tools/refusals.ts';
 export type { ToolArgumentsParse } from './tools/parseToolArguments.ts';
 export {
   normalizeToolArguments,

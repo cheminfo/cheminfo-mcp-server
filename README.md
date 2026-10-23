@@ -21,7 +21,7 @@ One tool definition gives a server these routes:
 npm install cheminfo-mcp-server
 ```
 
-The server entry needs `fastify` (5) and `zod` (4). `cheminfo-mcp-server/client` and `cheminfo-mcp-server/contract` need only `zod`, and run in a browser. `cheminfo-mcp-server/views` needs only `zod`, and `@fastify/static` (10) for `registerViewAssets()`.
+The server entry needs `fastify` (5) and `zod` (4), and `@fastify/swagger` (9) with `@fastify/swagger-ui` (6) for `registerToolApi()`. `cheminfo-mcp-server/client` and `cheminfo-mcp-server/contract` need only `zod`, and run in a browser. `cheminfo-mcp-server/views` needs only `zod`, and `@fastify/static` (10) for `registerViewAssets()`. `cheminfo-mcp-server/threads` needs nothing and loads nothing but Node's `worker_threads`. `cheminfo-mcp-server/testing` needs `fastify`.
 
 ## A server
 
@@ -60,7 +60,7 @@ await app.register(
 
 - A tool's schema is a zod object, strict unless made by `proxySchema()`: an unknown parameter is refused. A parameter set to `null` is left out before the arguments are checked, and a single value under another name is moved to a tool's only parameter, because small models rename it.
 - A tool that throws answers 500 to the JSON route and an error result to MCP. The error itself never reaches the caller; `onError` is told.
-- A tool refuses a call with its own status by throwing `new ToolRefusalError({ status: 503, code: 'loading', error: 'The copy is loading.', retryAfter: 30, extra: { mirror } })`. The JSON route answers that status, `{ error, code, ...extra }` and Retry-After; MCP answers `error` as an error result.
+- A tool refuses a call with its own status by throwing `new ToolRefusalError({ status: 503, code: 'loading', error: 'The copy is loading.', retryAfter: 30, extra: { mirror } })`. The JSON route answers that status, `{ error, code, ...extra }` and Retry-After; MCP answers `error` as an error result. The common refusals have a helper each (see [Refusals](#refusals)).
 - A call is checked in order: the tool's name (404, worded by `unknownToolMessage`), `precheck` (a cheap check, e.g. that a credential is there at all), the arguments (400), then `resolveContext`: nothing is spent on a call that would be refused anyway. A `routes.run.schema` that sets `headers` or `body` is checked by Fastify first, before the name.
 - `routes` sets each route's own `schema` (documentation for `@fastify/swagger`, headers, body, responses), `bodyLimit` and `config`: `{ catalog, run, mcp, mcpNotAllowed, resources, resourceRead }`. `withDocumentation()` types a schema's `tags`, `summary`, `description` and `hide` for Swagger. A `response` schema serializes exactly what it declares: one for `run` must declare `structuredContent` and `_meta`, and one for `catalog` each tool's `_meta`, or Fastify drops them.
 - Tools are read-only by default (`READ_ONLY_ANNOTATIONS`); a tool says otherwise with `annotations`.
@@ -347,6 +347,142 @@ In a frame, `installEmbedPage()` forwards Escape and calls
 `installSandboxWorkers()` and `installSandboxHistory()`, which act in an opaque
 origin only; both are exported on their own too.
 
+### The API and its documentation
+
+`registerToolApi()` registers the whole API of a site: the tool routes under
+`/v1`, their OpenAPI documentation at `/docs` (the document at `/docs/json`)
+and the JSON 404 of `/.well-known/*`. The document names its server
+relatively (`..`) and keeps the paths' `/v1`, so "Try it out" also works when
+the site is served under a path.
+
+```ts
+import { registerToolApi } from 'cheminfo-mcp-server';
+
+await registerToolApi(
+  app,
+  { name: 'equilibrium', version, tools, examples, allowedOrigins: '*' },
+  {
+    title: 'equilibrium.cheminfo.org tools',
+    description:
+      'The pH of a solution and titration curves, for chats and MCP clients.',
+  },
+);
+```
+
+Register it before the routes it should document; it registers
+`wellKnownNotFound` itself. The documentation's `version` defaults to the
+routes'.
+
+### Refusals
+
+A refusal is a status, a code a client branches on and a sentence the model
+reads. `REFUSAL_CODES` lists the codes every server of the family answers
+with, the status of each and when it is used; a server may add its own.
+
+| Helper                            | Status | Code                |
+| --------------------------------- | ------ | ------------------- |
+| `refuseInvalid(message)`          | 400    | `invalid-arguments` |
+| `refuseNotFound(message)`         | 404    | `not-found`         |
+| `refuseTimeout(message)`          | 422    | `timeout`           |
+| `refuseBusy(message, retryAfter)` | 503    | `busy`, Retry-After |
+
+Each throws a `ToolRefusalError`, so it ends a tool where it is called:
+
+```ts
+import { refuseInvalid } from 'cheminfo-mcp-server/threads';
+
+if (!isFormula(mf))
+  refuseInvalid(
+    `"${mf}" is not a molecular formula: give one such as C6H12O6.`,
+  );
+```
+
+`retryAfter` defaults to 5 seconds. The routes answer 500 `internal` for any
+other error.
+
+### Calls that may run too long: threads
+
+A call that may hold the server — a solver that can spin without end, a
+regular expression that backtracks catastrophically, WebAssembly that cannot
+be asked to stop — runs in a worker thread, which is terminated when its time
+is up. `cheminfo-mcp-server/threads` loads neither Fastify nor the MCP SDK nor
+zod, so a thread starts in milliseconds rather than the tenths of a second the
+main entry costs, and its `ToolRefusalError` is the very class of the main
+entry.
+
+The thread's module answers the calls posted to it:
+
+```ts
+// server/tools/solverThread.ts
+import { refuseInvalid, serveToolThread } from 'cheminfo-mcp-server/threads';
+
+serveToolThread((job: SolverJob) => {
+  if (job.components.length === 0) refuseInvalid('Give at least one compound.');
+  return solve(job);
+});
+```
+
+`runToolInThread()` runs one call in a fresh thread, ended once it answers:
+
+```ts
+import { runToolInThread } from 'cheminfo-mcp-server/threads';
+
+const answer = await runToolInThread<SolverJob, ToolAnswer>(
+  new URL('solverThread.ts', import.meta.url),
+  job,
+  {
+    timeoutMs: 10_000,
+    heapMb: 128,
+    busyMessage: (count) =>
+      `The server is already solving ${count} equilibria: try again in a few seconds.`,
+    timeoutMessage: (seconds) =>
+      `The solver found no answer within ${seconds} s: leave a compound out.`,
+  },
+);
+```
+
+- At most `maxThreads` calls (2) run at once in the process; one more is
+  refused at once with 503 `busy` and Retry-After (`retryAfter`, 5 s), never
+  queued.
+- A call past `timeoutMs` (10 s, the thread's start included) is refused with
+  422 `timeout`, worded by `timeoutMessage(seconds, job)`, and its thread
+  terminated.
+- A `ToolRefusalError` thrown in the thread is the caller's refusal; any other
+  error rejects with its message. The answer must survive `postMessage`.
+- The thread's heap is capped at `heapMb` (256); reaching it rejects with
+  `ERR_WORKER_OUT_OF_MEMORY`. No flag of this process reaches the thread
+  (`execArgv: []`): `--watch` is refused there, and type stripping needs none.
+
+`createToolThreadPool()` keeps its threads loaded between calls, for a module
+that loads something heavy such as OpenChemLib:
+
+```ts
+import { createToolThreadPool } from 'cheminfo-mcp-server/threads';
+
+const pool = createToolThreadPool<ToolJob, ToolAnswer>({
+  threadUrl: new URL('tools/toolThread.ts', import.meta.url),
+  threads: 2,
+  maxWaiting: 4,
+  deadlineMs: 20_000,
+});
+const answer = await pool.run(job);
+app.addHook('onClose', () => pool.close());
+```
+
+- No thread starts before the first call. A thread left idle stays, without
+  holding the process open.
+- `maxWaiting` calls (4) wait for a thread; one more is refused with 503
+  `busy`. A call past `deadlineMs` (20 s, the thread's start included) is
+  refused with 422 `timeout`, and its thread thrown away.
+- A thread that cannot start, or stops without answering, rejects the call
+  with the cause; the pool goes on with a new thread.
+- The pool posts `{ id, request }`, the family's worker request. A thread
+  that answers in its own protocol, such as the page's worker
+  (`{ id, ok, response }`), is read through `decode(message)`, which returns
+  the reply `serveToolThread()` would have posted:
+  `{ id, ok: true, answer }`, `{ id, ok: false, refusal }` or
+  `{ id, ok: false, failure }`.
+
 ### Example questions
 
 `examples` lists questions the tools answer, with what a correct answer
@@ -396,6 +532,51 @@ if (run.ok) {
 `resources()` lists the views, and `readResource(uri)` reads one, asking again with its ETag and reusing the page the server says is unchanged.
 
 Every reply is checked against the contract. A malformed side channel is dropped, never the result. A redirect is never followed, so a credential never leaves for another address. A failure is `refused` (the server's own code and sentence, with Retry-After, and its whole refusal in `reply`, the server's own fields included), `unreachable`, `timeout` or `invalid-reply`.
+
+## Testing a server
+
+`cheminfo-mcp-server/testing` calls a server the way the chat and MCP clients
+do, through Fastify's `inject`:
+
+```ts
+import {
+  checkToolExamples,
+  injectMcpRequest,
+  injectToolCall,
+} from 'cheminfo-mcp-server/testing';
+
+const response = await injectToolCall(app, 'solutionPh', { components });
+const list = await injectMcpRequest(app, { method: 'tools/list' });
+```
+
+`injectMcpRequest(app, { method, params, id })` sends the JSON-RPC request
+with the headers of an MCP client (`id` 1 by default). Both take `prefix`
+(`/v1`) and more `headers` as options.
+
+`checkToolExamples()` answers every example question without a model: it runs
+the call a model makes for each and checks that the result already holds
+every text a correct answer contains, ignoring case. It returns the problems,
+one sentence each naming its question:
+
+```ts
+const CALLS = {
+  'What is the pH of 0.1 M acetic acid?': {
+    tool: 'solutionPh',
+    arguments: { components: [{ name: 'acetic acid', concentration: 0.1 }] },
+  },
+};
+
+test('every example is answered by the call a model makes', async () => {
+  expect(
+    await checkToolExamples({ examples: EXAMPLES, calls: CALLS, app }),
+  ).toStrictEqual([]);
+});
+```
+
+A problem is a question without a call, a call without a question, a call to a
+tool the example does not name, a call not answered with 200, or a text the
+result lacks. The calls run one after the other, as a server limits the calls
+it runs at once.
 
 ## The contract
 
