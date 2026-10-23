@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/cheminfo/cheminfo-mcp-server/compare/v0.6.2...v0.7.0) (2026-10-23)
+
+
+### Features
+
+* add thread runner, test helpers, registerToolApi and refusal helpers ([dcbcc76](https://github.com/cheminfo/cheminfo-mcp-server/commit/dcbcc7622fe652a861e7cfcd07641b8c959db75e))
+
 ## [0.6.2](https://github.com/cheminfo/cheminfo-mcp-server/compare/v0.6.1...v0.6.2) (2026-10-22)
 
 
