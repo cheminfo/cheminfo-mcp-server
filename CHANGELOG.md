@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/cheminfo/cheminfo-mcp-server/compare/v0.7.0...v0.7.1) (2026-11-01)
+
+
+### Bug Fixes
+
+* map a renamed argument to the one required parameter ([9738553](https://github.com/cheminfo/cheminfo-mcp-server/commit/97385533cc246260194f81fc125be0d0814ab65c))
+
 ## [0.7.0](https://github.com/cheminfo/cheminfo-mcp-server/compare/v0.6.2...v0.7.0) (2026-10-23)
 
 
