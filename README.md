@@ -58,7 +58,7 @@ await app.register(
 );
 ```
 
-- A tool's schema is a zod object, strict unless made by `proxySchema()`: an unknown parameter is refused. A parameter set to `null` is left out before the arguments are checked, and a single value under another name is moved to a tool's only parameter, because small models rename it.
+- A tool's schema is a zod object, strict unless made by `proxySchema()`: an unknown parameter is refused. A parameter set to `null` is left out before the arguments are checked, and a value under a name the tool does not know is moved to its main parameter (its only one, else its one required one) when that is not already given, because small models rename it.
 - A tool that throws answers 500 to the JSON route and an error result to MCP. The error itself never reaches the caller; `onError` is told.
 - A tool refuses a call with its own status by throwing `new ToolRefusalError({ status: 503, code: 'loading', error: 'The copy is loading.', retryAfter: 30, extra: { mirror } })`. The JSON route answers that status, `{ error, code, ...extra }` and Retry-After; MCP answers `error` as an error result. The common refusals have a helper each (see [Refusals](#refusals)).
 - A call is checked in order: the tool's name (404, worded by `unknownToolMessage`), `precheck` (a cheap check, e.g. that a credential is there at all), the arguments (400), then `resolveContext`: nothing is spent on a call that would be refused anyway. A `routes.run.schema` that sets `headers` or `body` is checked by Fastify first, before the name.

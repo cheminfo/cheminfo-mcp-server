@@ -23,6 +23,39 @@ test("a single value under another name goes to the tool's only parameter", () =
   });
 });
 
+test('a value under another name goes to the one required parameter, beside the optional ones', () => {
+  const element = {
+    name: 'elementProperties',
+    schema: z.strictObject({
+      element: z.string(),
+      only: z.array(z.enum(['atomicWeight'])).optional(),
+    }),
+  };
+
+  expect(parseToolArguments(element, { symbol: 'Au' })).toStrictEqual({
+    success: true,
+    data: { element: 'Au' },
+  });
+  expect(
+    parseToolArguments(element, { symbol: 'Au', only: ['atomicWeight'] }),
+  ).toStrictEqual({
+    success: true,
+    data: { element: 'Au', only: ['atomicWeight'] },
+  });
+});
+
+test('nothing moves when the main parameter is unclear or already given', () => {
+  const twoRequired = {
+    name: 'addNumbers',
+    schema: z.strictObject({ a: z.number(), b: z.number() }),
+  };
+
+  const parsed = parseToolArguments(twoRequired, { x: 1 });
+
+  expect(parsed.success).toBe(false);
+  expect(parsed.success ? '' : parsed.error).toContain('Unrecognized key: "x"');
+});
+
 test('anything else is refused with the explanation and the parameters', () => {
   expect(parseToolArguments(pair, { a: 1, c: 2 })).toStrictEqual({
     success: false,

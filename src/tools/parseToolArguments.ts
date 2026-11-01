@@ -51,8 +51,11 @@ export function parseToolArguments<Schema extends ToolSchema>(
 }
 
 /**
- * Move a single value given under another name to a schema's only
- * parameter, when the arguments do not fit as they are.
+ * Move a value given under a name the tool does not know to its main
+ * parameter, when the arguments do not fit as they are: small models rename
+ * it (`symbol` for `element`). The main parameter is the schema's only one,
+ * else its one required parameter; nothing moves when there is no such
+ * parameter, when it is already given, or when more than one name is unknown.
  * @param schema - The tool's schema.
  * @param parameters - The arguments, without nulls.
  * @returns The arguments, renamed when that is safe.
@@ -62,11 +65,35 @@ export function normalizeToolArguments(
   parameters: Record<string, unknown>,
 ): Record<string, unknown> {
   if (schema.safeParse(parameters).success) return parameters;
-  const keys = Object.keys(schema.shape);
-  const values = Object.values(parameters);
-  const [key] = keys;
-  if (key !== undefined && keys.length === 1 && values.length === 1) {
-    return { [key]: values[0] };
+  const unknown = Object.keys(parameters).filter(
+    (key) => !Object.hasOwn(schema.shape, key),
+  );
+  const [renamed] = unknown;
+  const target = mainParameter(schema);
+  if (
+    unknown.length !== 1 ||
+    renamed === undefined ||
+    target === undefined ||
+    Object.hasOwn(parameters, target)
+  ) {
+    return parameters;
   }
-  return parameters;
+  const { [renamed]: value, ...rest } = parameters;
+  return { ...rest, [target]: value };
+}
+
+/**
+ * The parameter a renamed value is meant for.
+ * @param schema - The tool's schema.
+ * @returns Its only parameter, else its one required parameter, else
+ *   undefined.
+ */
+function mainParameter(schema: ToolSchema): string | undefined {
+  const keys = Object.keys(schema.shape);
+  if (keys.length === 1) return keys[0];
+  const required = keys.filter((key) => {
+    const field = schema.shape[key];
+    return field !== undefined && !z.safeParse(field, undefined).success;
+  });
+  return required.length === 1 ? required[0] : undefined;
 }
